@@ -42,7 +42,7 @@ const particles = [];
 const floatingText = [];
 const bots = [];
 const TEAMS = [{ name: 'Red', color: '#ff6961' }, { name: 'Green', color: '#77dd77' }, { name: 'Blue', color: '#70a7ff' }];
-const player = { id: 'player', name: 'James', color: `hsl(${Math.floor(Math.random() * 360)} 82% 62%)`, skin: 'neon', eaten: 0, splitCooldown: 0, splitKills: 0 };
+const player = { id: 'player', name: 'James', color: `hsl(${Math.floor(Math.random() * 360)} 82% 62%)`, skin: 'neon', eaten: 0, splitCooldown: 0, splitKills: 0, controlledCell: null };
 const pointer = { x: innerWidth / 2, y: innerHeight / 2, active: false };
 const camera = { x: WORLD.width / 2, y: WORLD.height / 2, zoom: 1 };
 let gameState = 'menu';
@@ -100,7 +100,7 @@ function centroid(owner) {
   if (!pieces.length) return { x: WORLD.width / 2, y: WORLD.height / 2 };
   return pieces.reduce((center, cell) => ({ x: center.x + cell.visualX / pieces.length, y: center.y + cell.visualY / pieces.length }), { x: 0, y: 0 });
 }
-function resetPlayer() { createCell(player, WORLD.width / 2, WORLD.height / 2, 12); player.eaten = 0; player.splitCooldown = 0; }
+function resetPlayer() { player.controlledCell = createCell(player, WORLD.width / 2, WORLD.height / 2, 12); player.eaten = 0; player.splitCooldown = 0; }
 function setupBots() {
   bots.length = 0;
   for (let index = 0; index < BOT_TARGET; index += 1) { const team = TEAMS[index % 3]; const owner = { id: `bot-${index}`, name: BOT_NAMES[index % BOT_NAMES.length], color: gameMode === 'teams' ? team.color : randomColor(), skin: randomSkin(), tactic: Math.random(), team: gameMode === 'teams' ? team.name : null }; bots.push(owner); const spawn = spawnPoint(); createCell(owner, spawn.x, spawn.y, 15 + Math.random() * 28); }
@@ -109,6 +109,7 @@ function startGame() {
   player.name = nicknameInput.value.trim().slice(0, 14) || 'James'; player.color = randomColor(); player.skin = skinSelect.value; player.splitKills = 0; gameMode = modeSelect.value; player.team = gameMode === 'teams' ? TEAMS[0].name : null; if (gameMode === 'teams') player.color = TEAMS[0].color; document.body.dataset.theme = themeSelect.value; cells.length = 0; ejectedMass.length = 0; particles.length = 0; floatingText.length = 0; mothercells.length = 0; selectedCell = null; match.startedAt = performance.now(); match.peakMass = 12; match.kills = 0; match.food = 0; match.viruses = 0; achievements.clear(); spectatorFocus = null; spectatorFree = false; resetPlayer(); setupBots(); if (gameMode === 'experimental') for (let index = 0; index < 8; index += 1) createMothercell(); gameState = 'playing'; spectatorBar.hidden = true; menuScreen.hidden = true; gameOverScreen.hidden = true; startAudio();
 }
 function startSpectator() { gameMode = 'ffa'; cells.length = 0; ejectedMass.length = 0; setupBots(); spectatorFocus = bots[0]; spectatorFree = false; gameState = 'spectator'; menuScreen.hidden = true; gameOverScreen.hidden = true; spectatorBar.hidden = false; }
+function handoffPlayerControl() { const survivor = ownedCells(player).filter((cell) => cell !== player.controlledCell).sort((first, second) => second.targetMass - first.targetMass)[0]; if (!survivor) return false; if (player.controlledCell) player.controlledCell.aiControlled = true; survivor.aiControlled = false; player.controlledCell = survivor; selectedCell = null; emitBurst(survivor.x, survivor.y, player.color, 18, 150); addFloatingText(survivor.x, survivor.y, 'CONTROL TRANSFERRED', '#ffffff'); return true; }
 function unlockAchievement(id, title) { if (achievements.has(id)) return; achievements.add(id); achievementToast.textContent = `Achievement unlocked: ${title}`; achievementToast.hidden = false; setTimeout(() => { achievementToast.hidden = true; }, 2600); }
 function applyPowerup(cell, orb) { if (orb.type === 'speed') cell.speedBoost = 7; if (orb.type === 'magnet') cell.magnet = 8; if (orb.type === 'merge') { cell.instantMerge = true; for (const sibling of ownedCells(cell.owner)) sibling.mergeReadyAt = 0; } emitBurst(orb.x, orb.y, '#ffdc70', 16, 180); addFloatingText(cell.x, cell.y, orb.type === 'speed' ? 'SPEED SURGE' : orb.type === 'magnet' ? 'MASS MAGNET' : 'INSTANT MERGE', '#ffdc70'); playSound('eat', .8); }
 function updateMothercells(delta) { if (gameMode !== 'experimental') return; for (const mother of mothercells) { mother.timer -= delta; mother.pulse += delta * 2; if (mother.timer <= 0) { mother.timer = 1.4; const angle = Math.random() * Math.PI * 2; food.push({ x: clamp(mother.x + Math.cos(angle) * (mother.radius + 18), 20, WORLD.width - 20), y: clamp(mother.y + Math.sin(angle) * (mother.radius + 18), 20, WORLD.height - 20), radius: 6, color: '#ff9be8' }); } for (const cell of cells.slice()) if (cell.radius < mother.radius && distanceBetween(cell, mother) < mother.radius * 1.2) { emitBurst(cell.x, cell.y, '#ff75d4', 18, 200); addFloatingText(cell.x, cell.y, 'MOTHERCELL', '#ff75d4'); removeCell(cell); if (cell.owner === player) endGame('loss'); } } }
