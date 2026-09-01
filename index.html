@@ -20,6 +20,12 @@
           <label for="nickname">Choose your nickname</label>
           <input id="nickname" name="nickname" maxlength="14" autocomplete="nickname" placeholder="James" required>
           <div class="menu-options">
+            <label for="mode">Game mode</label>
+            <select id="mode" name="mode">
+              <option value="ffa">Free For All</option>
+              <option value="teams">Teams Mode</option>
+              <option value="experimental">Experimental Mode</option>
+            </select>
             <label for="skin">Cell skin</label>
             <select id="skin" name="skin">
               <option value="neon">Neon glow</option>
@@ -35,6 +41,7 @@
           </div>
           <button type="submit">Enter the arena <span>↗</span></button>
         </form>
+        <button class="secondary-button" id="menuSpectateButton" type="button">Watch the arena</button>
         <p class="control-line">Mouse or touch to move · Space to split · W to eject mass</p>
       </div>
     </section>
@@ -44,9 +51,25 @@
         <p class="eyebrow">The arena keeps moving</p>
         <h2 id="gameOverTitle">Cell lost</h2>
         <p class="menu-credit">You reached <strong id="finalMass">0</strong> mass</p>
+        <div class="match-report">
+          <div><span>survival</span><strong id="reportTime">0:00</strong></div>
+          <div><span>peak mass</span><strong id="reportPeak">0</strong></div>
+          <div><span>kills</span><strong id="reportKills">0</strong></div>
+          <div><span>food</span><strong id="reportFood">0</strong></div>
+          <div><span>viruses</span><strong id="reportViruses">0</strong></div>
+        </div>
         <button id="respawnButton" type="button">Start a new game <span>↗</span></button>
+        <button class="secondary-button" id="deathSpectateButton" type="button">Spectate rivals</button>
       </div>
     </section>
+
+    <section class="spectator-bar" id="spectatorBar" hidden>
+      <span><b>S</b> Spectator</span>
+      <button id="nextFocusButton" type="button">Next top cell ↻</button>
+      <span class="spectator-help">Drag to pan · wheel to zoom</span>
+    </section>
+
+    <div class="achievement-toast" id="achievementToast" role="status" aria-live="polite" hidden></div>
 
     <header class="brand-lockup" aria-label="Game title and creator">
       <div class="brand-mark">BC</div>
