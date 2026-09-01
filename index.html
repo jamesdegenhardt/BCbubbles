@@ -19,9 +19,23 @@
         <form id="startForm">
           <label for="nickname">Choose your nickname</label>
           <input id="nickname" name="nickname" maxlength="14" autocomplete="nickname" placeholder="James" required>
+          <div class="menu-options">
+            <label for="skin">Cell skin</label>
+            <select id="skin" name="skin">
+              <option value="neon">Neon glow</option>
+              <option value="planet">Planet</option>
+              <option value="geometry">Geometry</option>
+            </select>
+            <label for="theme">Arena theme</label>
+            <select id="theme" name="theme">
+              <option value="dark">Dark grid</option>
+              <option value="light">Light grid</option>
+              <option value="retro">Retro scan</option>
+            </select>
+          </div>
           <button type="submit">Enter the arena <span>↗</span></button>
         </form>
-        <p class="control-line">Mouse to move · Space to split · W to eject mass</p>
+        <p class="control-line">Mouse or touch to move · Space to split · W to eject mass</p>
       </div>
     </section>
 
