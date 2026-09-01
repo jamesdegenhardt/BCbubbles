@@ -152,12 +152,13 @@ function applyFood(cell) {
 function popCell(cell, virus) {
   const count = Math.min(15 + Math.floor(Math.random() * 6), MAX_CELLS - cells.length + 1);
   if (count < 2) return false;
-  const totalMass = cell.mass; const angleStep = Math.PI * 2 / count; removeCell(cell); emitBurst(cell.x, cell.y, '#7be06b', 30, 260); playSound('pop'); addFloatingText(cell.x, cell.y, `-${Math.floor(totalMass)}`, '#ff8b79');
+  const totalMass = cell.mass; const angleStep = Math.PI * 2 / count; const wasControlled = cell === player.controlledCell; removeCell(cell); emitBurst(cell.x, cell.y, '#7be06b', 30, 260); playSound('pop'); addFloatingText(cell.x, cell.y, `-${Math.floor(totalMass)}`, '#ff9a72');
   for (let index = 0; index < count; index += 1) {
     const angle = index * angleStep + Math.random() * .3; const pieceMass = Math.max(2, totalMass / count); const offset = virus.radius + 12;
-    const piece = createCell(cell.owner, clamp(cell.x + Math.cos(angle) * offset, 30, WORLD.width - 30), clamp(cell.y + Math.sin(angle) * offset, 30, WORLD.height - 30), pieceMass, { mergeReadyAt: performance.now() / 1000 + 8 });
+    const piece = createCell(cell.owner, clamp(cell.x + Math.cos(angle) * offset, 30, WORLD.width - 30), clamp(cell.y + Math.sin(angle) * offset, 30, WORLD.height - 30), pieceMass, { aiControlled: cell.owner === player, mergeReadyAt: performance.now() / 1000 + 8 });
     piece.impulseX = Math.cos(angle) * 260; piece.impulseY = Math.sin(angle) * 260;
   }
+  if (wasControlled) handoffPlayerControl();
   return true;
 }
 function consumeCells() {
@@ -166,7 +167,7 @@ function consumeCells() {
     for (let preyIndex = cells.length - 1; preyIndex >= 0; preyIndex -= 1) {
       const prey = cells[preyIndex];
       if (predator === prey || predator.owner === prey.owner || (gameMode === 'teams' && predator.owner.team && predator.owner.team === prey.owner.team) || predator.mass < prey.mass * 1.1) continue;
-      if (distanceBetween(predator, prey) < predator.radius - prey.radius * .3) { predator.targetMass += prey.mass; if (predator.owner === player) { player.eaten += 1; match.kills += 1; if (ownedCells(player).length > 1) { player.splitKills += 1; if (player.splitKills >= 10) unlockAchievement('split-specialist', 'Split Specialist'); } } emitBurst(prey.x, prey.y, prey.color, 12, 160); addFloatingText(predator.x, predator.y, `+${Math.floor(prey.mass)}`); playSound('eat'); removeCell(prey); break; }
+      if (distanceBetween(predator, prey) < predator.radius - prey.radius * .3) { predator.targetMass += prey.mass; if (predator.owner === player) { player.eaten += 1; match.kills += 1; if (ownedCells(player).length > 1) { player.splitKills += 1; if (player.splitKills >= 10) unlockAchievement('split-specialist', 'Split Specialist'); } } const wasControlled = prey === player.controlledCell; emitBurst(prey.x, prey.y, prey.color, 12, 160); addFloatingText(predator.x, predator.y, `+${Math.floor(prey.mass)}`); playSound('eat'); removeCell(prey); if (wasControlled && !handoffPlayerControl()) endGame('loss'); break; }
     }
   }
   for (const cell of cells.slice()) for (const virus of viruses) if (cell.radius > virus.radius * 1.1 && distanceBetween(cell, virus) < cell.radius - virus.radius * .2) { if (cell.owner === player) { match.viruses += 1; if (match.viruses >= 3) unlockAchievement('virus-buster', 'Virus Buster'); } popCell(cell, virus); break; }
