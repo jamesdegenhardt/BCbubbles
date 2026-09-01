@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#071019">
+  <title>BCbubbles | James Degenhardt</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="game-shell">
+    <canvas id="gameCanvas" aria-label="BCbubbles game arena"></canvas>
+
+    <section class="menu-screen" id="menuScreen" aria-labelledby="menuTitle">
+      <div class="menu-panel">
+        <p class="eyebrow">A living cell arena</p>
+        <h2 id="menuTitle">BCbubbles</h2>
+        <p class="menu-credit">Made by James Degenhardt</p>
+        <form id="startForm">
+          <label for="nickname">Choose your nickname</label>
+          <input id="nickname" name="nickname" maxlength="14" autocomplete="nickname" placeholder="James" required>
+          <button type="submit">Enter the arena <span>↗</span></button>
+        </form>
+        <p class="control-line">Mouse to move · Space to split · W to eject mass</p>
+      </div>
+    </section>
+
+    <section class="game-over-screen" id="gameOverScreen" aria-labelledby="gameOverTitle" hidden>
+      <div class="menu-panel">
+        <p class="eyebrow">The arena keeps moving</p>
+        <h2 id="gameOverTitle">Cell lost</h2>
+        <p class="menu-credit">You reached <strong id="finalMass">0</strong> mass</p>
+        <button id="respawnButton" type="button">Drop back in <span>↗</span></button>
+      </div>
+    </section>
+
+    <header class="brand-lockup" aria-label="Game title and creator">
+      <div class="brand-mark">BC</div>
+      <div>
+        <h1>BCbubbles</h1>
+        <p>by James Degenhardt</p>
+      </div>
+    </header>
+
+    <section class="score-panel" aria-label="Player stats">
+      <div class="stat-line"><span>mass</span><strong id="massValue">12</strong></div>
+      <div class="stat-line"><span>cells eaten</span><strong id="eatenValue">0</strong></div>
+      <div class="progress-track"><span id="massProgress"></span></div>
+    </section>
+
+    <section class="leaderboard" aria-label="Leaderboard">
+      <div class="leaderboard-heading"><span>Leaderboard</span><span class="live-label">Live</span></div>
+      <ol id="leaderboardList"></ol>
+    </section>
+
+    <div class="score-counter"><span>your mass</span><strong id="scoreMass">12</strong></div>
+
+    <div class="status-pill"><span class="status-dot"></span><span id="statusText">Arena live</span></div>
+    <div class="cursor-hint">Move to steer <span>·</span> Space to split</div>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>
