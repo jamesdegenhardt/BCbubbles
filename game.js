@@ -49,6 +49,7 @@ let gameMode = 'ffa';
 let spectatorFocus = null;
 let spectatorFree = false;
 let spectatorDrag = false;
+let selectedCell = null;
 let previousPointer = { x: 0, y: 0 };
 const match = { startedAt: 0, peakMass: 12, kills: 0, food: 0, viruses: 0 };
 const achievements = new Set();
@@ -88,7 +89,7 @@ function createMothercell() { const spawn = spawnPoint(300); mothercells.push({ 
 
 function createCell(owner, x, y, mass, options = {}) {
   const radius = radiusForMass(mass);
-  const cell = { owner, name: options.name || owner.name, color: options.color || owner.color, skin: options.skin || owner.skin || 'neon', x, y, visualX: x, visualY: y, radius, visualRadius: radius, mass, targetMass: mass, vx: 0, vy: 0, impulseX: 0, impulseY: 0, state: 'forage', target: null, stateTime: 0, mergeReadyAt: options.mergeReadyAt || 0, decayNotice: 0, actionCooldown: 0, speedBoost: 0, magnet: 0, instantMerge: false };
+  const cell = { owner, name: options.name || owner.name, color: options.color || owner.color, skin: options.skin || owner.skin || 'neon', aiControlled: options.aiControlled || false, x, y, visualX: x, visualY: y, radius, visualRadius: radius, mass, targetMass: mass, vx: 0, vy: 0, impulseX: 0, impulseY: 0, state: 'forage', target: null, stateTime: 0, mergeReadyAt: options.mergeReadyAt || 0, decayNotice: 0, actionCooldown: 0, speedBoost: 0, magnet: 0, instantMerge: false };
   cells.push(cell);
   return cell;
 }
@@ -104,7 +105,7 @@ function setupBots() {
   for (let index = 0; index < BOT_TARGET; index += 1) { const team = TEAMS[index % 3]; const owner = { id: `bot-${index}`, name: BOT_NAMES[index % BOT_NAMES.length], color: gameMode === 'teams' ? team.color : randomColor(), skin: randomSkin(), tactic: Math.random(), team: gameMode === 'teams' ? team.name : null }; bots.push(owner); const spawn = spawnPoint(); createCell(owner, spawn.x, spawn.y, 15 + Math.random() * 28); }
 }
 function startGame() {
-  player.name = nicknameInput.value.trim().slice(0, 14) || 'James'; player.color = randomColor(); player.skin = skinSelect.value; player.splitKills = 0; gameMode = modeSelect.value; player.team = gameMode === 'teams' ? TEAMS[0].name : null; if (gameMode === 'teams') player.color = TEAMS[0].color; document.body.dataset.theme = themeSelect.value; cells.length = 0; ejectedMass.length = 0; particles.length = 0; floatingText.length = 0; mothercells.length = 0; match.startedAt = performance.now(); match.peakMass = 12; match.kills = 0; match.food = 0; match.viruses = 0; achievements.clear(); spectatorFocus = null; spectatorFree = false; resetPlayer(); setupBots(); if (gameMode === 'experimental') for (let index = 0; index < 8; index += 1) createMothercell(); gameState = 'playing'; spectatorBar.hidden = true; menuScreen.hidden = true; gameOverScreen.hidden = true; startAudio();
+  player.name = nicknameInput.value.trim().slice(0, 14) || 'James'; player.color = randomColor(); player.skin = skinSelect.value; player.splitKills = 0; gameMode = modeSelect.value; player.team = gameMode === 'teams' ? TEAMS[0].name : null; if (gameMode === 'teams') player.color = TEAMS[0].color; document.body.dataset.theme = themeSelect.value; cells.length = 0; ejectedMass.length = 0; particles.length = 0; floatingText.length = 0; mothercells.length = 0; selectedCell = null; match.startedAt = performance.now(); match.peakMass = 12; match.kills = 0; match.food = 0; match.viruses = 0; achievements.clear(); spectatorFocus = null; spectatorFree = false; resetPlayer(); setupBots(); if (gameMode === 'experimental') for (let index = 0; index < 8; index += 1) createMothercell(); gameState = 'playing'; spectatorBar.hidden = true; menuScreen.hidden = true; gameOverScreen.hidden = true; startAudio();
 }
 function startSpectator() { gameMode = 'ffa'; cells.length = 0; ejectedMass.length = 0; setupBots(); spectatorFocus = bots[0]; spectatorFree = false; gameState = 'spectator'; menuScreen.hidden = true; gameOverScreen.hidden = true; spectatorBar.hidden = false; }
 function unlockAchievement(id, title) { if (achievements.has(id)) return; achievements.add(id); achievementToast.textContent = `Achievement unlocked: ${title}`; achievementToast.hidden = false; setTimeout(() => { achievementToast.hidden = true; }, 2600); }
@@ -185,12 +186,18 @@ function separateSiblingCells(now) {
     if (distance < desired) { const push = (desired - distance) / distance * .5; const x = (first.x - second.x) * push; const y = (first.y - second.y) * push; first.x += x; first.y += y; second.x -= x; second.y -= y; }
   }
 }
+function mergeSelectedCell(now) {
+  if (!selectedCell || selectedCell.owner !== player || now < selectedCell.mergeReadyAt) return false;
+  const target = ownedCells(player).find((cell) => cell !== selectedCell);
+  if (!target) return false;
+  target.targetMass += selectedCell.targetMass; addFloatingText(target.x, target.y, `+${Math.floor(selectedCell.targetMass)}`, '#a8f36d'); emitBurst(selectedCell.x, selectedCell.y, player.color, 12, 120); removeCell(selectedCell); selectedCell = null; playSound('eat'); return true;
+}
 function botStrike(cell) {
   if (cell.actionCooldown > 0 || cell.state !== 'ambush' || !cell.target || cell.mass < cell.target.mass * 1.45 || cells.length >= MAX_CELLS) return;
   const angle = Math.atan2(cell.target.y - cell.y, cell.target.x - cell.x);
   if (distanceBetween(cell, cell.target) < 360) {
     const halfMass = cell.targetMass / 2; cell.mass = halfMass; cell.targetMass = halfMass;
-    const half = createCell(cell.owner, cell.x + Math.cos(angle) * cell.radius, cell.y + Math.sin(angle) * cell.radius, halfMass, { mergeReadyAt: performance.now() / 1000 + 8 });
+    const half = createCell(cell.owner, cell.x + Math.cos(angle) * cell.radius, cell.y + Math.sin(angle) * cell.radius, halfMass, { aiControlled: cell.owner === player, mergeReadyAt: performance.now() / 1000 + 8 });
     half.impulseX = Math.cos(angle) * 430; half.impulseY = Math.sin(angle) * 430; emitBurst(cell.x, cell.y, cell.color, 12, 190); playSound('split', .35);
   } else if (distanceBetween(cell, cell.target) < 520) launchMass(cell, angle);
   cell.actionCooldown = .9;
@@ -205,7 +212,7 @@ function splitPlayer() {
     const halfMass = cell.targetMass / 2;
     cell.mass = halfMass; cell.targetMass = halfMass;
     const offset = cell.radius * .8;
-    const half = createCell(player, cell.x + Math.cos(angle) * offset, cell.y + Math.sin(angle) * offset, halfMass, { mergeReadyAt: performance.now() / 1000 + 8 });
+    const half = createCell(player, cell.x + Math.cos(angle) * offset, cell.y + Math.sin(angle) * offset, halfMass, { aiControlled: true, mergeReadyAt: performance.now() / 1000 + 8 });
     half.impulseX = Math.cos(angle) * 460; half.impulseY = Math.sin(angle) * 460; splitCount += 1;
   }
   if (splitCount) { player.splitCooldown = .65; emitBurst(ownedCells(player)[0]?.x || WORLD.width / 2, ownedCells(player)[0]?.y || WORLD.height / 2, player.color, 20, 220); addFloatingText(centroid(player).x, centroid(player).y, 'SPLIT', '#ffffff'); playSound('split'); }
@@ -243,7 +250,32 @@ function update(delta, now) {
       if (cell.target) { const targetX = cell.state === 'flee' ? cell.x * 2 - cell.target.x : cell.target.x; const targetY = cell.state === 'flee' ? cell.y * 2 - cell.target.y : cell.target.y; const distance = Math.hypot(targetX - cell.x, targetY - cell.y); if (distance) { directionX = (targetX - cell.x) / distance; directionY = (targetY - cell.y) / distance; } }
       botStrike(cell);
     }
-    const speed = Math.max(55, 235 / Math.pow(cell.mass / 12, .23)) * (cell.speedBoost > 0 ? 1.65 : 1); const steering = 1 - Math.pow(.0001, delta); cell.actionCooldown = Math.max(0, cell.actionCooldown - delta); updatePowerups(cell, delta); cell.vx = lerp(cell.vx, directionX * speed + cell.impulseX, steering); cell.vy = lerp(cell.vy, directionY * speed + cell.impulseY, steering); cell.impulseX *= Math.pow(.002, delta); cell.impulseY *= Math.pow(.002, delta); cell.x = clamp(cell.x + cell.vx * delta, cell.radius, WORLD.width - cell.radius); cell.y = clamp(cell.y + cell.vy * delta, cell.radius, WORLD.height - cell.radius); cell.visualX = lerp(cell.visualX, cell.x, 1 - Math.pow(.00001, delta)); cell.visualY = lerp(cell.visualY, cell.y, 1 - Math.pow(.00001, delta)); cell.mass = lerp(cell.mass, cell.targetMass, 1 - Math.pow(.0001, delta)); cell.decayNotice -= delta; if (cell.targetMass > DECAY_THRESHOLD) { const loss = Math.min(cell.targetMass - DECAY_THRESHOLD, (cell.targetMass - DECAY_THRESHOLD) * DECAY_RATE * delta); cell.targetMass -= loss; if (cell.decayNotice <= 0) { addFloatingText(cell.x, cell.y, `-${Math.max(1, Math.floor(loss))}`, '#ff9a72'); cell.decayNotice = 1.4; } } cell.radius = radiusForMass(cell.mass); cell.visualRadius = lerp(cell.visualRadius, radiusForMass(cell.targetMass), 1 - Math.pow(.00001, delta)); applyFood(cell);
+    if (cell.owner === player && cell.aiControlled) {
+      cell.stateTime -= delta;
+      if (cell.stateTime <= 0 || !cell.target) { const decision = chooseBotTarget(cell); cell.state = decision.state; cell.target = decision.target; cell.stateTime = .5 + Math.random(); }
+      if (cell.target) { const targetX = cell.state === 'flee' ? cell.x * 2 - cell.target.x : cell.target.x; const targetY = cell.state === 'flee' ? cell.y * 2 - cell.target.y : cell.target.y; const distance = Math.hypot(targetX - cell.x, targetY - cell.y); if (distance) { directionX = (targetX - cell.x) / distance; directionY = (targetY - cell.y) / distance; } }
+    }
+    const speed = Math.max(55, 235 / Math.pow(cell.mass / 12, .23)) * (cell.speedBoost > 0 ? 1.65 : 1);
+    const steering = 1 - Math.pow(.0001, delta);
+    cell.actionCooldown = Math.max(0, cell.actionCooldown - delta);
+    updatePowerups(cell, delta);
+    cell.vx = lerp(cell.vx, directionX * speed + cell.impulseX, steering);
+    cell.vy = lerp(cell.vy, directionY * speed + cell.impulseY, steering);
+    cell.impulseX *= Math.pow(.002, delta); cell.impulseY *= Math.pow(.002, delta);
+    cell.x = clamp(cell.x + cell.vx * delta, cell.radius, WORLD.width - cell.radius);
+    cell.y = clamp(cell.y + cell.vy * delta, cell.radius, WORLD.height - cell.radius);
+    cell.visualX = lerp(cell.visualX, cell.x, 1 - Math.pow(.00001, delta));
+    cell.visualY = lerp(cell.visualY, cell.y, 1 - Math.pow(.00001, delta));
+    cell.mass = lerp(cell.mass, cell.targetMass, 1 - Math.pow(.0001, delta));
+    cell.decayNotice -= delta;
+    if (gameMode !== 'teams' && cell.targetMass > DECAY_THRESHOLD) {
+      const loss = Math.min(cell.targetMass - DECAY_THRESHOLD, (cell.targetMass - DECAY_THRESHOLD) * DECAY_RATE * delta);
+      cell.targetMass -= loss;
+      if (cell.decayNotice <= 0) { addFloatingText(cell.x, cell.y, `-${Math.max(1, Math.floor(loss))}`, '#ff9a72'); cell.decayNotice = 1.4; }
+    }
+    cell.radius = radiusForMass(cell.mass);
+    cell.visualRadius = lerp(cell.visualRadius, radiusForMass(cell.targetMass), 1 - Math.pow(.00001, delta));
+    applyFood(cell);
   }
   updateMothercells(delta); separateSiblingCells(now); mergePlayerPieces(now); updateEjected(delta); updateEffects(delta); consumeCells();
   const focus = spectatorFocus && ownedCells(spectatorFocus)[0] ? centroid(spectatorFocus) : centroid(player); if (gameState === 'spectator' && spectatorFree) { camera.x = clamp(camera.x, innerWidth / 2 / camera.zoom, WORLD.width - innerWidth / 2 / camera.zoom); camera.y = clamp(camera.y, innerHeight / 2 / camera.zoom, WORLD.height - innerHeight / 2 / camera.zoom); } else { camera.x = focus.x; camera.y = focus.y; } const totalMass = ownedCells(player).reduce((sum, cell) => sum + cell.targetMass, 0); match.peakMass = Math.max(match.peakMass, totalMass); camera.zoom = gameState === 'spectator' && spectatorFree ? camera.zoom : clamp(1.05 - Math.sqrt(Math.max(0, totalMass)) / 1200, .62, 1.05); updateUi(totalMass);
@@ -270,8 +302,9 @@ function drawCell(cell) {
   context.fillStyle = cell.color; context.shadowColor = cell.color; context.shadowBlur = cell.owner === player ? 30 : 16; context.fillRect(cell.visualX - cell.visualRadius, cell.visualY - cell.visualRadius, cell.visualRadius * 2, cell.visualRadius * 2); context.shadowBlur = 0;
   if (cell.skin === 'planet') { const planet = context.createRadialGradient(cell.visualX - cell.visualRadius * .35, cell.visualY - cell.visualRadius * .4, 1, cell.visualX, cell.visualY, cell.visualRadius); planet.addColorStop(0, 'rgba(255,255,255,.85)'); planet.addColorStop(.18, 'rgba(255,255,255,.12)'); planet.addColorStop(1, 'rgba(0,0,0,.5)'); context.fillStyle = planet; context.fillRect(cell.visualX - cell.visualRadius, cell.visualY - cell.visualRadius, cell.visualRadius * 2, cell.visualRadius * 2); context.strokeStyle = 'rgba(255,255,255,.5)'; context.lineWidth = 2; context.beginPath(); context.ellipse(cell.visualX, cell.visualY, cell.visualRadius * .9, cell.visualRadius * .23, -.3, 0, Math.PI * 2); context.stroke(); }
   if (cell.skin === 'geometry') { context.strokeStyle = 'rgba(255,255,255,.62)'; context.lineWidth = Math.max(2, cell.visualRadius * .08); context.beginPath(); context.moveTo(cell.visualX, cell.visualY - cell.visualRadius); context.lineTo(cell.visualX + cell.visualRadius, cell.visualY); context.lineTo(cell.visualX, cell.visualY + cell.visualRadius); context.lineTo(cell.visualX - cell.visualRadius, cell.visualY); context.closePath(); context.stroke(); }
-  context.restore(); context.beginPath(); context.strokeStyle = cell.owner === player ? 'rgba(255,255,255,.8)' : 'rgba(255,255,255,.35)'; context.lineWidth = cell.owner === player ? 3 : 2; context.arc(cell.visualX, cell.visualY, cell.visualRadius - 1, 0, Math.PI * 2); context.stroke(); context.fillStyle = '#fff'; context.textAlign = 'center'; context.textBaseline = 'middle'; context.font = `600 ${Math.max(10, cell.visualRadius * .3)}px Space Grotesk, sans-serif`; context.shadowColor = 'rgba(0,0,0,.35)'; context.shadowBlur = 5; context.fillText(cell.name, cell.visualX, cell.visualY); context.shadowBlur = 0;
+  context.restore(); context.beginPath(); context.strokeStyle = cell.owner === player ? 'rgba(255,255,255,.8)' : 'rgba(255,255,255,.35)'; context.lineWidth = cell.owner === player ? 3 : 2; context.arc(cell.visualX, cell.visualY, cell.visualRadius - 1, 0, Math.PI * 2); context.stroke(); if (cell === selectedCell) { context.beginPath(); context.strokeStyle = '#ffcc66'; context.lineWidth = 4; context.arc(cell.visualX, cell.visualY, cell.visualRadius + 6, 0, Math.PI * 2); context.stroke(); } context.fillStyle = '#fff'; context.textAlign = 'center'; context.textBaseline = 'middle'; context.font = `600 ${Math.max(10, cell.visualRadius * .3)}px Space Grotesk, sans-serif`; context.shadowColor = 'rgba(0,0,0,.35)'; context.shadowBlur = 5; context.fillText(cell.name, cell.visualX, cell.visualY); context.shadowBlur = 0;
 }
+function cellAtScreenPoint(clientX, clientY) { const worldX = camera.x + (clientX - innerWidth / 2) / camera.zoom; const worldY = camera.y + (clientY - innerHeight / 2) / camera.zoom; return ownedCells(player).slice().reverse().find((cell) => Math.hypot(worldX - cell.x, worldY - cell.y) <= cell.visualRadius / camera.zoom); }
 function drawMinimap(width, height) {
   const mapWidth = 156; const mapHeight = 108; const left = width - mapWidth - 24; const top = height - mapHeight - 24; const scaleX = mapWidth / WORLD.width; const scaleY = mapHeight / WORLD.height;
   context.save(); context.fillStyle = 'rgba(5, 13, 20, .8)'; context.fillRect(left, top, mapWidth, mapHeight); context.strokeStyle = 'rgba(168,243,109,.65)'; context.lineWidth = 1; context.strokeRect(left, top, mapWidth, mapHeight);
@@ -305,7 +338,7 @@ menuSpectateButton.addEventListener('click', startSpectator);
 deathSpectateButton.addEventListener('click', () => { gameOverScreen.hidden = true; startSpectator(); });
 nextFocusButton.addEventListener('click', cycleSpectatorFocus);
 let lastTouchAt = 0;
-addEventListener('resize', resize); addEventListener('pointermove', (event) => { if (gameState === 'spectator' && spectatorDrag) { camera.x -= (event.clientX - previousPointer.x) / camera.zoom; camera.y -= (event.clientY - previousPointer.y) / camera.zoom; spectatorFocus = null; spectatorFree = true; } pointer.x = event.clientX; pointer.y = event.clientY; previousPointer = { x: event.clientX, y: event.clientY }; pointer.active = true; }); addEventListener('pointerdown', (event) => { pointer.x = event.clientX; pointer.y = event.clientY; previousPointer = { x: event.clientX, y: event.clientY }; pointer.active = true; if (gameState === 'spectator') spectatorDrag = true; if (event.pointerType === 'touch' && performance.now() - lastTouchAt < 350) splitPlayer(); lastTouchAt = performance.now(); }); addEventListener('pointerup', () => { spectatorDrag = false; }); addEventListener('pointerleave', () => { pointer.active = false; spectatorDrag = false; });
+addEventListener('resize', resize); addEventListener('pointermove', (event) => { if (gameState === 'spectator' && spectatorDrag) { camera.x -= (event.clientX - previousPointer.x) / camera.zoom; camera.y -= (event.clientY - previousPointer.y) / camera.zoom; spectatorFocus = null; spectatorFree = true; } pointer.x = event.clientX; pointer.y = event.clientY; previousPointer = { x: event.clientX, y: event.clientY }; pointer.active = true; }); addEventListener('pointerdown', (event) => { pointer.x = event.clientX; pointer.y = event.clientY; previousPointer = { x: event.clientX, y: event.clientY }; pointer.active = true; if (gameState === 'spectator') spectatorDrag = true; if (gameState === 'playing' && event.pointerType !== 'touch') { const clicked = cellAtScreenPoint(event.clientX, event.clientY); if (clicked) { if (selectedCell && selectedCell !== clicked) mergeSelectedCell(performance.now() / 1000); else selectedCell = clicked; } } if (event.pointerType === 'touch' && performance.now() - lastTouchAt < 350) splitPlayer(); lastTouchAt = performance.now(); }); addEventListener('pointerup', () => { spectatorDrag = false; }); addEventListener('pointerleave', () => { pointer.active = false; spectatorDrag = false; });
 addEventListener('wheel', (event) => { if (gameState !== 'spectator') return; event.preventDefault(); camera.zoom = clamp(camera.zoom * (event.deltaY > 0 ? .9 : 1.1), .35, 2.2); spectatorFocus = null; spectatorFree = true; }, { passive: false });
 addEventListener('keydown', (event) => {
   if (event.code === 'Space') {
@@ -313,5 +346,6 @@ addEventListener('keydown', (event) => {
     splitPlayer();
   }
   if (event.code === 'KeyW') { event.preventDefault(); ejectMass(); }
+  if (event.code === 'KeyM') { event.preventDefault(); mergeSelectedCell(performance.now() / 1000); }
 });
 resize(); resetPlayer(); setupBots(); updateUi(12); requestAnimationFrame(frame);
