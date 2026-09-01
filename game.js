@@ -12,6 +12,7 @@ const eatenValue = document.getElementById('eatenValue');
 const massProgress = document.getElementById('massProgress');
 const statusText = document.getElementById('statusText');
 const finalMass = document.getElementById('finalMass');
+const gameOverTitle = document.getElementById('gameOverTitle');
 
 const WORLD = { width: 5200, height: 3600 };
 const FOOD_TARGET = 420;
@@ -66,9 +67,11 @@ function setupBots() {
 function startGame() {
   player.name = nicknameInput.value.trim().slice(0, 14) || 'James'; player.color = randomColor(); cells.length = 0; ejectedMass.length = 0; resetPlayer(); setupBots(); gameState = 'playing'; menuScreen.hidden = true; gameOverScreen.hidden = true;
 }
-function endGame() {
+function endGame(result) {
   if (gameState !== 'playing') return;
   const total = ownedCells(player).reduce((sum, cell) => sum + cell.targetMass, 0); finalMass.textContent = Math.floor(total); gameOverScreen.hidden = false; gameState = 'over';
+  gameOverTitle.textContent = result === 'win' ? 'Arena conquered' : 'Cell lost';
+  gameOverScreen.querySelector('.eyebrow').textContent = result === 'win' ? 'Every rival has been absorbed' : 'The arena keeps moving';
 }
 
 function nearestFood(cell) {
@@ -89,7 +92,6 @@ function chooseBotTarget(cell) {
   return { state: 'forage', target: nearestFood(cell) };
 }
 function removeCell(cell) { const index = cells.indexOf(cell); if (index >= 0) cells.splice(index, 1); }
-function respawnBot(owner) { const spawn = spawnPoint(); createCell(owner, spawn.x, spawn.y, 15 + Math.random() * 22); }
 function applyFood(cell) {
   for (let index = food.length - 1; index >= 0; index -= 1) {
     const pellet = food[index];
@@ -113,12 +115,12 @@ function consumeCells() {
     for (let preyIndex = cells.length - 1; preyIndex >= 0; preyIndex -= 1) {
       const prey = cells[preyIndex];
       if (predator === prey || predator.owner === prey.owner || predator.mass < prey.mass * 1.1) continue;
-      if (distanceBetween(predator, prey) < predator.radius - prey.radius * .3) { predator.targetMass += prey.mass; if (predator.owner === player) player.eaten += 1; const owner = prey.owner; removeCell(prey); if (owner !== player && !ownedCells(owner).length) respawnBot(owner); break; }
+      if (distanceBetween(predator, prey) < predator.radius - prey.radius * .3) { predator.targetMass += prey.mass; if (predator.owner === player) player.eaten += 1; removeCell(prey); break; }
     }
   }
   for (const cell of cells.slice()) for (const virus of viruses) if (cell.radius > virus.radius * 1.1 && distanceBetween(cell, virus) < cell.radius - virus.radius * .2) { popCell(cell, virus); break; }
-  if (!ownedCells(player).length) endGame();
-  for (const bot of bots) if (!ownedCells(bot).length) respawnBot(bot);
+  if (!ownedCells(player).length) endGame('loss');
+  else if (bots.every((bot) => !ownedCells(bot).length)) endGame('win');
 }
 function mergePlayerPieces(now) {
   for (let firstIndex = 0; firstIndex < cells.length; firstIndex += 1) for (let secondIndex = firstIndex + 1; secondIndex < cells.length; secondIndex += 1) {
@@ -134,6 +136,21 @@ function separateSiblingCells(now) {
     const distance = distanceBetween(first, second) || .01; const desired = (first.radius + second.radius) * .8;
     if (distance < desired) { const push = (desired - distance) / distance * .5; const x = (first.x - second.x) * push; const y = (first.y - second.y) * push; first.x += x; first.y += y; second.x -= x; second.y -= y; }
   }
+}
+function splitPlayer() {
+  if (gameState !== 'playing' || player.splitCooldown > 0 || cells.length >= MAX_CELLS) return;
+  const angle = Math.atan2((pointer.active ? pointer.y : innerHeight / 2) - innerHeight / 2, (pointer.active ? pointer.x : innerWidth / 2) - innerWidth / 2);
+  const pieces = ownedCells(player).slice();
+  let splitCount = 0;
+  for (const cell of pieces) {
+    if (cell.targetMass < 24 || cells.length >= MAX_CELLS) continue;
+    const halfMass = cell.targetMass / 2;
+    cell.mass = halfMass; cell.targetMass = halfMass;
+    const offset = cell.radius * .8;
+    const half = createCell(player, cell.x + Math.cos(angle) * offset, cell.y + Math.sin(angle) * offset, halfMass, { mergeReadyAt: performance.now() / 1000 + 8 });
+    half.impulseX = Math.cos(angle) * 460; half.impulseY = Math.sin(angle) * 460; splitCount += 1;
+  }
+  if (splitCount) player.splitCooldown = .65;
 }
 function launchMass(cell, angle) {
   if (cell.targetMass < 18 || ejectedMass.length >= MAX_CELLS) return;
@@ -199,16 +216,12 @@ let previous = performance.now();
 function frame(now) { const delta = Math.min((now - previous) / 1000, .05); previous = now; update(delta, now / 1000); draw(); requestAnimationFrame(frame); }
 startForm.addEventListener('submit', (event) => { event.preventDefault(); startGame(); });
 respawnButton.addEventListener('click', startGame);
-addEventListener('resize', resize); addEventListener('pointermove', (event) => { pointer.x = event.clientX; pointer.y = event.clientY; pointer.active = true; }); addEventListener('pointerleave', () => { pointer.active = false; });
+let lastTouchAt = 0;
+addEventListener('resize', resize); addEventListener('pointermove', (event) => { pointer.x = event.clientX; pointer.y = event.clientY; pointer.active = true; }); addEventListener('pointerdown', (event) => { pointer.x = event.clientX; pointer.y = event.clientY; pointer.active = true; if (event.pointerType === 'touch' && performance.now() - lastTouchAt < 350) splitPlayer(); lastTouchAt = performance.now(); }); addEventListener('pointerleave', () => { pointer.active = false; });
 addEventListener('keydown', (event) => {
   if (event.code === 'Space') {
     event.preventDefault();
-    if (gameState === 'playing' && player.splitCooldown <= 0) {
-      const angle = Math.atan2((pointer.active ? pointer.y : innerHeight / 2) - innerHeight / 2, (pointer.active ? pointer.x : innerWidth / 2) - innerWidth / 2);
-      const pieces = ownedCells(player).slice();
-      for (const cell of pieces) if (cell.targetMass >= 24 && cells.length < MAX_CELLS) { const halfMass = cell.targetMass / 2; cell.mass = halfMass; cell.targetMass = halfMass; const offset = cell.radius * .8; const half = createCell(player, cell.x + Math.cos(angle) * offset, cell.y + Math.sin(angle) * offset, halfMass, { mergeReadyAt: performance.now() / 1000 + 8 }); half.impulseX = Math.cos(angle) * 460; half.impulseY = Math.sin(angle) * 460; }
-      player.splitCooldown = .65;
-    }
+    splitPlayer();
   }
   if (event.code === 'KeyW') { event.preventDefault(); ejectMass(); }
 });

@@ -18,9 +18,10 @@ body {
 }
 .game-shell, #gameCanvas { width: 100%; height: 100%; }
 .game-shell { position: relative; isolation: isolate; }
-#gameCanvas { display: block; cursor: crosshair; }
+#gameCanvas { display: block; cursor: crosshair; touch-action: none; }
 .menu-screen, .game-over-screen { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; background: rgba(4, 11, 17, .7); backdrop-filter: blur(8px); }
 .menu-screen { background: radial-gradient(circle at 50% 45%, rgba(35, 80, 73, .35), rgba(4, 11, 17, .86) 62%); }
+.game-over-screen { animation: screen-fade-in .6s ease both; }
 .menu-screen[hidden], .game-over-screen[hidden] { display: none; }
 .menu-panel { width: min(420px, calc(100vw - 40px)); padding: 34px; border: 1px solid rgba(236, 247, 237, .18); border-radius: 10px; background: rgba(7, 16, 25, .82); box-shadow: 0 28px 90px rgba(0,0,0,.38); animation: rise-in .7s cubic-bezier(.2,.8,.2,1) both; }
 .eyebrow { margin: 0 0 13px; color: var(--accent); font: 10px 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .14em; }
@@ -35,6 +36,7 @@ body {
 .menu-panel button span { float: right; font-size: 18px; line-height: 12px; }
 .control-line { margin: 24px 0 0; color: rgba(244,247,242,.42); font: 10px 'DM Mono', monospace; line-height: 1.6; }
 @keyframes rise-in { from { opacity: 0; transform: translateY(18px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes screen-fade-in { from { opacity: 0; } to { opacity: 1; } }
 
 .brand-lockup, .score-panel, .leaderboard, .score-counter, .status-pill, .cursor-hint { position: absolute; z-index: 2; }
 .brand-lockup {
