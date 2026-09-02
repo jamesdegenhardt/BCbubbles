@@ -7,10 +7,12 @@ const nicknameInput = document.getElementById('nickname');
 const respawnButton = document.getElementById('respawnButton');
 const leaderboardList = document.getElementById('leaderboardList');
 const massValue = document.getElementById('massValue');
+const healthValue = document.getElementById('healthValue');
 const scoreMass = document.getElementById('scoreMass');
 const eatenValue = document.getElementById('eatenValue');
 const massProgress = document.getElementById('massProgress');
 const statusText = document.getElementById('statusText');
+const gasStatus = document.getElementById('gasStatus');
 const finalMass = document.getElementById('finalMass');
 const gameOverTitle = document.getElementById('gameOverTitle');
 const skinSelect = document.getElementById('skin');
@@ -34,6 +36,7 @@ const SHRINK_DELAY = 60;
 const SHRINK_PHASE = 20;
 const SHRINK_PAUSE = 20;
 const SHRINK_CYCLES = 3;
+const GAS_DAMAGE_RATE = 7;
 const BOT_NAMES = ['Nova', 'Miso', 'Orbit', 'Kite', 'Pixel', 'Zest', 'Comet', 'Echo', 'Mochi', 'Vanta', 'Sprout', 'Rook'];
 const food = [];
 const cells = [];
@@ -76,11 +79,16 @@ function randomFood() { return { x: 35 + Math.random() * (WORLD.width - 70), y: 
 function spawnPoint(margin = 180) { return { x: margin + Math.random() * (WORLD.width - margin * 2), y: margin + Math.random() * (WORLD.height - margin * 2) }; }
 function resetArena() { arena.left = 0; arena.top = 0; arena.right = WORLD.width; arena.bottom = WORLD.height; }
 function updateArena(elapsed) {
-  if (elapsed < SHRINK_DELAY) return;
+  if (elapsed < SHRINK_DELAY) return { phase: 'safe', remaining: SHRINK_DELAY - elapsed };
   const cycleTime = SHRINK_PHASE + SHRINK_PAUSE;
-  const cycleProgress = clamp((elapsed - SHRINK_DELAY) / cycleTime, 0, SHRINK_CYCLES);
-  const inset = Math.min(WORLD.width, WORLD.height) * .45 * cycleProgress / SHRINK_CYCLES;
+  const cycleElapsed = elapsed - SHRINK_DELAY;
+  const cycleProgress = clamp(Math.floor(cycleElapsed / cycleTime), 0, SHRINK_CYCLES);
+  const phaseElapsed = cycleElapsed - cycleProgress * cycleTime;
+  const shrinking = cycleProgress < SHRINK_CYCLES && phaseElapsed < SHRINK_PHASE;
+  const completedCycles = cycleProgress >= SHRINK_CYCLES ? SHRINK_CYCLES : cycleProgress + (shrinking ? phaseElapsed / SHRINK_PHASE : 1);
+  const inset = Math.min(WORLD.width, WORLD.height) * .45 * completedCycles / SHRINK_CYCLES;
   arena.left = inset; arena.top = inset; arena.right = WORLD.width - inset; arena.bottom = WORLD.height - inset;
+  return { phase: shrinking ? 'shrinking' : cycleProgress < SHRINK_CYCLES ? 'pause' : 'final', remaining: shrinking ? SHRINK_PHASE - phaseElapsed : cycleProgress < SHRINK_CYCLES ? cycleTime - phaseElapsed : 0 };
 }
 function arenaCenter() { return { x: (arena.left + arena.right) / 2, y: (arena.top + arena.bottom) / 2 }; }
 function clampCameraToArena() {
@@ -108,7 +116,7 @@ function createMothercell() { const spawn = spawnPoint(300); mothercells.push({ 
 
 function createCell(owner, x, y, mass, options = {}) {
   const radius = radiusForMass(mass);
-  const cell = { owner, name: options.name || owner.name, color: options.color || owner.color, skin: options.skin || owner.skin || 'neon', aiControlled: options.aiControlled || false, x, y, visualX: x, visualY: y, radius, visualRadius: radius, mass, targetMass: mass, vx: 0, vy: 0, impulseX: 0, impulseY: 0, state: 'forage', target: null, stateTime: 0, mergeReadyAt: options.mergeReadyAt || 0, decayNotice: 0, actionCooldown: 0, speedBoost: 0, magnet: 0, instantMerge: false };
+  const cell = { owner, name: options.name || owner.name, color: options.color || owner.color, skin: options.skin || owner.skin || 'neon', aiControlled: options.aiControlled || false, x, y, visualX: x, visualY: y, radius, visualRadius: radius, mass, targetMass: mass, health: 100, vx: 0, vy: 0, impulseX: 0, impulseY: 0, state: 'forage', target: null, stateTime: 0, mergeReadyAt: options.mergeReadyAt || 0, decayNotice: 0, actionCooldown: 0, speedBoost: 0, magnet: 0, instantMerge: false };
   cells.push(cell);
   return cell;
 }
@@ -148,17 +156,30 @@ function nearestFood(cell) {
   return nearest;
 }
 function chooseBotTarget(cell) {
-  let threat = null; let prey = null; let closestThreat = Infinity; let closestPrey = Infinity;
+  let threat = null; let prey = null; let closestThreat = Infinity; let bestPreyScore = 0;
+  const edgeDistance = Math.min(cell.x - arena.left, arena.right - cell.x, cell.y - arena.top, arena.bottom - cell.y);
+  if (edgeDistance < 180) return { state: 'escape', target: arenaCenter() };
   for (const other of cells) {
     if (other === cell || other.owner === cell.owner || (gameMode === 'teams' && other.owner.team && other.owner.team === cell.owner.team)) continue;
     const distance = distanceBetween(cell, other);
     if (other.mass > cell.mass * 1.35 && distance < closestThreat) { threat = other; closestThreat = distance; }
-    if (cell.mass > other.mass * 1.1 && distance < closestPrey) { prey = other; closestPrey = distance; }
+    if (cell.mass > other.mass * 1.1) { const preyScore = other.mass / Math.max(distance, 1); if (preyScore > bestPreyScore) { prey = other; bestPreyScore = preyScore; } }
   }
   if (threat && closestThreat < 650) return { state: 'flee', target: threat };
-  if (prey && closestPrey < 550 && cell.owner.tactic < .65) return { state: 'ambush', target: prey };
-  if (prey && closestPrey < 800) return { state: 'chase', target: prey };
+  const preyDistance = prey ? distanceBetween(cell, prey) : Infinity;
+  if (prey && preyDistance < 550 && cell.owner.tactic < .8) return { state: 'ambush', target: prey };
+  if (prey && preyDistance < 800) return { state: 'chase', target: prey };
   return { state: 'forage', target: nearestFood(cell) };
+}
+function applyGasDamage(cell, delta) {
+  const outside = cell.x < arena.left || cell.x > arena.right || cell.y < arena.top || cell.y > arena.bottom;
+  if (!outside) return false;
+  cell.health = Math.max(0, cell.health - GAS_DAMAGE_RATE * delta);
+  if (cell.health > 0) return false;
+  const wasControlled = cell === player.controlledCell;
+  emitBurst(cell.x, cell.y, '#b9d66a', 16, 170); addFloatingText(cell.x, cell.y, 'POISONED', '#d7ef8c'); removeCell(cell);
+  if (wasControlled && !handoffPlayerControl()) endGame('loss');
+  return true;
 }
 function removeCell(cell) { const index = cells.indexOf(cell); if (index >= 0) cells.splice(index, 1); }
 function applyFood(cell) {
@@ -253,9 +274,9 @@ function updateEjected(delta) {
 
 function update(delta, now) {
   if (gameState !== 'playing' && gameState !== 'spectator') return;
-  if (gameState === 'playing') updateArena((performance.now() - match.startedAt) / 1000);
+  const gasPhase = gameState === 'playing' ? updateArena((performance.now() - match.startedAt) / 1000) : { phase: 'safe', remaining: 0 };
   const playerCenter = centroid(player); player.splitCooldown = Math.max(0, player.splitCooldown - delta);
-  for (const cell of cells) {
+  for (const cell of cells.slice()) {
     let directionX = 0; let directionY = 0;
     if (cell.owner === player && cell === player.controlledCell) {
       const targetX = cell.x + (pointer.active ? pointer.x - innerWidth / 2 : 0) / camera.zoom; const targetY = cell.y + (pointer.active ? pointer.y - innerHeight / 2 : 0) / camera.zoom; const distance = Math.hypot(targetX - cell.x, targetY - cell.y); if (distance) { directionX = (targetX - cell.x) / distance; directionY = (targetY - cell.y) / distance; }
@@ -276,8 +297,8 @@ function update(delta, now) {
     cell.vx = lerp(cell.vx, directionX * speed + cell.impulseX, steering);
     cell.vy = lerp(cell.vy, directionY * speed + cell.impulseY, steering);
     cell.impulseX *= Math.pow(.002, delta); cell.impulseY *= Math.pow(.002, delta);
-    cell.x = clamp(cell.x + cell.vx * delta, arena.left + cell.radius, arena.right - cell.radius);
-    cell.y = clamp(cell.y + cell.vy * delta, arena.top + cell.radius, arena.bottom - cell.radius);
+    cell.x = clamp(cell.x + cell.vx * delta, cell.radius, WORLD.width - cell.radius);
+    cell.y = clamp(cell.y + cell.vy * delta, cell.radius, WORLD.height - cell.radius);
     cell.visualX = lerp(cell.visualX, cell.x, 1 - Math.pow(.00001, delta));
     cell.visualY = lerp(cell.visualY, cell.y, 1 - Math.pow(.00001, delta));
     cell.mass = lerp(cell.mass, cell.targetMass, 1 - Math.pow(.0001, delta));
@@ -285,13 +306,17 @@ function update(delta, now) {
     cell.radius = radiusForMass(cell.mass);
     cell.visualRadius = lerp(cell.visualRadius, radiusForMass(cell.targetMass), 1 - Math.pow(.00001, delta));
     applyFood(cell);
+    if (applyGasDamage(cell, delta)) continue;
   }
   updateMothercells(delta); mergePlayerPieces(now); updateEjected(delta); updateEffects(delta); consumeCells();
-  const focus = gameState === 'playing' && player.controlledCell ? player.controlledCell : spectatorFocus && ownedCells(spectatorFocus)[0] ? centroid(spectatorFocus) : centroid(player); if (gameState === 'spectator' && spectatorFree) clampCameraToArena(); else { camera.x = focus.x; camera.y = focus.y; } const totalMass = ownedCells(player).reduce((sum, cell) => sum + cell.targetMass, 0); match.peakMass = Math.max(match.peakMass, totalMass); camera.zoom = gameState === 'spectator' && spectatorFree ? camera.zoom : clamp(1.05 - Math.sqrt(Math.max(0, totalMass)) / 1200, .62, 1.05); updateUi(totalMass);
+  const focus = gameState === 'playing' && player.controlledCell ? player.controlledCell : spectatorFocus && ownedCells(spectatorFocus)[0] ? centroid(spectatorFocus) : centroid(player); if (gameState === 'spectator' && spectatorFree) clampCameraToArena(); else { camera.x = focus.x; camera.y = focus.y; } const totalMass = ownedCells(player).reduce((sum, cell) => sum + cell.targetMass, 0); match.peakMass = Math.max(match.peakMass, totalMass); camera.zoom = gameState === 'spectator' && spectatorFree ? camera.zoom : clamp(1.05 - Math.sqrt(Math.max(0, totalMass)) / 1200, .62, 1.05); updateUi(totalMass, gasPhase);
 }
-function updateUi(totalMass) {
+function updateUi(totalMass, gasPhase = { phase: 'safe', remaining: 0 }) {
   const livingBots = bots.filter((bot) => ownedCells(bot).length);
-  massValue.textContent = Math.floor(totalMass); scoreMass.textContent = Math.floor(totalMass); eatenValue.textContent = player.eaten; massProgress.style.width = `${Math.min(100, 5 + totalMass / 2)}%`; statusText.textContent = `${livingBots.length} rivals in arena`;
+  const controlledHealth = player.controlledCell ? Math.ceil(player.controlledCell.health) : 0;
+  const seconds = Math.max(0, Math.ceil(gasPhase.remaining));
+  const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  massValue.textContent = Math.floor(totalMass); scoreMass.textContent = Math.floor(totalMass); healthValue.textContent = `${controlledHealth}%`; eatenValue.textContent = player.eaten; massProgress.style.width = `${Math.min(100, 5 + totalMass / 2)}%`; statusText.textContent = `${livingBots.length} rivals in arena`; gasStatus.textContent = gasPhase.phase === 'safe' ? `Gas starts in ${clock}` : gasPhase.phase === 'shrinking' ? `Gas advances ${clock}` : gasPhase.phase === 'pause' ? `Gas pauses ${clock}` : 'Gas settled';
   const rankings = [player, ...livingBots].map((owner) => ({ owner, mass: ownedCells(owner).reduce((sum, cell) => sum + cell.targetMass, 0) })).sort((first, second) => second.mass - first.mass).slice(0, 10);
   if (gameState === 'playing' && rankings[0]?.owner === player) unlockAchievement('apex', 'Apex Predator');
   leaderboardList.innerHTML = rankings.map((entry) => `<li class="${entry.owner === player ? 'is-player' : ''}"><strong>${entry.owner.name}</strong><em>${Math.floor(entry.mass)}</em></li>`).join('');
@@ -304,6 +329,13 @@ function drawVirus(virus) {
   context.save(); context.translate(virus.x, virus.y); context.rotate(virus.rotation); context.beginPath(); const spikes = 20;
   for (let index = 0; index < spikes; index += 1) { const angle = index / spikes * Math.PI * 2; const outer = index % 2 ? virus.radius * 1.08 : virus.radius * 1.22; const inner = virus.radius * .8; context.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer); context.lineTo(Math.cos(angle + Math.PI / spikes) * inner, Math.sin(angle + Math.PI / spikes) * inner); }
   context.closePath(); context.fillStyle = '#7be06b'; context.shadowColor = '#52d879'; context.shadowBlur = 18; context.fill(); context.shadowBlur = 0; context.strokeStyle = 'rgba(8, 49, 35, .8)'; context.lineWidth = 3; context.stroke(); context.restore(); virus.rotation += .001;
+}
+function drawPoisonGas() {
+  if (arena.left <= 0) return;
+  context.save(); context.fillStyle = 'rgba(155, 191, 77, .16)';
+  context.fillRect(0, 0, WORLD.width, arena.top); context.fillRect(0, arena.bottom, WORLD.width, WORLD.height - arena.bottom);
+  context.fillRect(0, arena.top, arena.left, arena.bottom - arena.top); context.fillRect(arena.right, arena.top, WORLD.width - arena.right, arena.bottom - arena.top);
+  context.strokeStyle = 'rgba(207, 238, 112, .72)'; context.lineWidth = 8; context.strokeRect(arena.left, arena.top, arena.right - arena.left, arena.bottom - arena.top); context.restore();
 }
 function drawMothercell(mother) { context.save(); context.translate(mother.x, mother.y); const pulse = 1 + Math.sin(mother.pulse) * .04; context.scale(pulse, pulse); context.beginPath(); context.fillStyle = '#ff70d9'; context.shadowColor = '#ff70d9'; context.shadowBlur = 28; context.arc(0, 0, mother.radius, 0, Math.PI * 2); context.fill(); context.shadowBlur = 0; context.strokeStyle = 'rgba(255,222,249,.8)'; context.lineWidth = 3; context.stroke(); context.restore(); }
 function drawPowerup(orb) { const colors = { speed: '#ffcf5c', magnet: '#6de7ff', merge: '#d390ff' }; context.save(); context.translate(orb.x, orb.y); context.rotate(orb.pulse); context.fillStyle = colors[orb.type]; context.shadowColor = colors[orb.type]; context.shadowBlur = 18; context.beginPath(); context.moveTo(0, -orb.radius); context.lineTo(orb.radius, 0); context.lineTo(0, orb.radius); context.lineTo(-orb.radius, 0); context.closePath(); context.fill(); context.restore(); orb.pulse += .012; }
@@ -326,7 +358,7 @@ function drawMinimap(width, height) {
 }
 function draw() {
   const width = innerWidth; const height = innerHeight; const theme = document.body.dataset.theme || 'dark'; const background = theme === 'light' ? '#dfeadd' : theme === 'retro' ? '#160d28' : '#071019'; context.clearRect(0, 0, width, height); context.fillStyle = background; context.fillRect(0, 0, width, height); const glow = context.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height) * .72); glow.addColorStop(0, theme === 'light' ? 'rgba(135, 183, 137, .3)' : theme === 'retro' ? 'rgba(121, 52, 152, .28)' : 'rgba(22, 55, 60, .42)'); glow.addColorStop(1, 'rgba(7, 16, 25, 0)'); context.fillStyle = glow; context.fillRect(0, 0, width, height);
-  context.save(); context.translate(width / 2, height / 2); context.scale(camera.zoom, camera.zoom); context.translate(-camera.x, -camera.y); drawGrid(width, height); context.strokeStyle = 'rgba(168, 243, 109, .55)'; context.lineWidth = 12; context.strokeRect(arena.left, arena.top, arena.right - arena.left, arena.bottom - arena.top);
+  context.save(); context.translate(width / 2, height / 2); context.scale(camera.zoom, camera.zoom); context.translate(-camera.x, -camera.y); drawGrid(width, height); drawPoisonGas(); context.strokeStyle = 'rgba(168, 243, 109, .55)'; context.lineWidth = 12; context.strokeRect(arena.left, arena.top, arena.right - arena.left, arena.bottom - arena.top);
   for (const pellet of food) { context.beginPath(); context.fillStyle = pellet.color; context.shadowColor = pellet.color; context.shadowBlur = 10; context.arc(pellet.x, pellet.y, pellet.radius, 0, Math.PI * 2); context.fill(); context.shadowBlur = 0; }
   for (const virus of viruses) drawVirus(virus);
   for (const mother of mothercells) drawMothercell(mother);

@@ -102,6 +102,7 @@ h1 { margin: 0; font-size: 18px; line-height: 1; letter-spacing: -.03em; }
   padding: 8px 12px; border: 1px solid var(--line); border-radius: 99px; background: rgba(7,16,25,.65);
   color: var(--muted); font: 10px 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .08em; backdrop-filter: blur(10px);
 }
+.status-pill #gasStatus { color: var(--accent); }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
 .cursor-hint { right: clamp(20px, 4vw, 56px); bottom: 31px; color: rgba(244,247,242,.45); font: 10px 'DM Mono', monospace; }
 @media (max-width: 560px) {

@@ -81,6 +81,7 @@
 
     <section class="score-panel" aria-label="Player stats">
       <div class="stat-line"><span>mass</span><strong id="massValue">12</strong></div>
+      <div class="stat-line"><span>health</span><strong id="healthValue">100%</strong></div>
       <div class="stat-line"><span>cells eaten</span><strong id="eatenValue">0</strong></div>
       <div class="progress-track"><span id="massProgress"></span></div>
     </section>
@@ -93,7 +94,7 @@
     <div class="score-counter"><span>your mass</span><strong id="scoreMass">12</strong></div>
     <button class="split-button" id="splitButton" type="button" aria-label="Split cell">Split <b>SPACE</b></button>
 
-    <div class="status-pill"><span class="status-dot"></span><span id="statusText">Arena live</span></div>
+    <div class="status-pill"><span class="status-dot"></span><span id="statusText">Arena live</span><span id="gasStatus">Gas starts in 1:00</span></div>
     <div class="cursor-hint">Move to steer <span>·</span> Space to split <span>·</span> M to merge selected</div>
   </main>
   <script src="game.js"></script>
