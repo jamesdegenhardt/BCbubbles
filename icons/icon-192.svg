@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="35%" r="75%"><stop offset="0" stop-color="#183f46"/><stop offset="1" stop-color="#071019"/></radialGradient>
+    <radialGradient id="cell" cx="32%" cy="25%" r="72%"><stop offset="0" stop-color="#f4ffcf"/><stop offset=".22" stop-color="#a8f36d"/><stop offset=".72" stop-color="#49a96b"/><stop offset="1" stop-color="#1e5360"/></radialGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="192" height="192" rx="42" fill="url(#bg)"/>
+  <circle cx="96" cy="96" r="59" fill="none" stroke="#a8f36d" stroke-opacity=".25" stroke-width="2"/>
+  <circle cx="96" cy="96" r="48" fill="url(#cell)" stroke="#f4ffcf" stroke-width="4" filter="url(#glow)"/>
+  <path d="M63 90c17-24 45-31 70-15-9 28-37 49-67 42-7-2-9-16-3-27Z" fill="#d8ff9a" fill-opacity=".32"/>
+  <circle cx="76" cy="71" r="9" fill="#fff" fill-opacity=".7"/>
+  <text x="96" y="108" fill="#071019" font-family="sans-serif" font-size="25" font-weight="800" text-anchor="middle">BC</text>
+</svg>

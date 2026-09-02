@@ -4,6 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#071019">
+  <meta name="description" content="BCbubbles is a fast neon cell arena survival game.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="BCbubbles">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="icons/icon-192.svg">
+  <link rel="apple-touch-icon" href="icons/icon-192.svg">
   <title>BCbubbles | James Degenhardt</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -48,7 +56,8 @@
           <button type="submit">Enter the arena <span>↗</span></button>
         </form>
         <button class="secondary-button" id="menuSpectateButton" type="button">Watch the arena</button>
-        <p class="control-line">Mouse or touch to move · Space split · W eject · Shift dash · E evolve</p>
+        <p class="control-line">Mouse/touch move · Wheel zoom · Space split · W eject · Shift dash</p>
+        <p class="control-line">1 reject · 2 accept · 3 offer · 4 betray</p>
       </div>
     </section>
 
@@ -106,8 +115,11 @@
     <button class="betray-button" id="betrayButton" type="button">Betray</button>
 
     <div class="status-pill"><span class="status-dot"></span><span id="statusText">Arena live</span><span id="gasStatus">Gas starts in 1:00</span></div>
-    <div class="cursor-hint">Move to steer <span>·</span> Space split <span>·</span> Shift dash <span>·</span> M merge</div>
+    <div class="cursor-hint">Move · Wheel zoom · Space split · 1-4 alliance actions · M merge</div>
   </main>
   <script src="game.js"></script>
+  <script>
+    if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('./sw.js');
+  </script>
 </body>
 </html>

@@ -469,7 +469,7 @@ allianceRejectButton.addEventListener('click', (event) => { event.stopPropagatio
 betrayButton.addEventListener('click', (event) => { event.stopPropagation(); betrayAlliances(); });
 let lastTouchAt = 0;
 addEventListener('resize', resize); addEventListener('pointermove', (event) => { if (gameState === 'spectator' && spectatorDrag) { camera.x -= (event.clientX - previousPointer.x) / camera.zoom; camera.y -= (event.clientY - previousPointer.y) / camera.zoom; spectatorFocus = null; spectatorFree = true; } pointer.x = event.clientX; pointer.y = event.clientY; previousPointer = { x: event.clientX, y: event.clientY }; pointer.active = true; }); addEventListener('pointerdown', (event) => { if (event.target.closest('button, input, select')) return; pointer.x = event.clientX; pointer.y = event.clientY; previousPointer = { x: event.clientX, y: event.clientY }; pointer.active = true; if (gameState === 'spectator') spectatorDrag = true; if (gameState === 'playing' && event.pointerType !== 'touch') { const clicked = cellAtScreenPoint(event.clientX, event.clientY); if (clicked) { if (selectedCell && selectedCell !== clicked) mergeSelectedCell(performance.now() / 1000); else selectedCell = clicked; } else { const bot = cellAtAnyScreenPoint(event.clientX, event.clientY); if (bot) offerAlliance(player, bot.owner); } } if (event.pointerType === 'touch' && performance.now() - lastTouchAt < 350) splitPlayer(); lastTouchAt = performance.now(); }); addEventListener('pointerup', () => { spectatorDrag = false; }); addEventListener('pointerleave', () => { pointer.active = false; spectatorDrag = false; });
-addEventListener('wheel', (event) => { if (gameState !== 'spectator') return; event.preventDefault(); camera.zoom = clamp(camera.zoom * (event.deltaY > 0 ? .9 : 1.1), .35, 2.2); spectatorFocus = null; spectatorFree = true; }, { passive: false });
+addEventListener('wheel', (event) => { if (gameState !== 'playing' && gameState !== 'spectator') return; event.preventDefault(); camera.zoom = clamp(camera.zoom * (event.deltaY > 0 ? .9 : 1.1), .35, 2.2); if (gameState === 'spectator') { spectatorFocus = null; spectatorFree = true; } }, { passive: false });
 addEventListener('keydown', (event) => {
   if (event.code === 'Space') {
     event.preventDefault();
@@ -478,5 +478,9 @@ addEventListener('keydown', (event) => {
   if (event.code === 'KeyW') { event.preventDefault(); ejectMass(); }
   if (event.code === 'KeyM') { event.preventDefault(); mergeSelectedCell(performance.now() / 1000); }
   if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') { event.preventDefault(); dashCell(player.controlledCell); }
+  if (event.code === 'Digit1') { event.preventDefault(); rejectAlliance(); }
+  if (event.code === 'Digit2') { event.preventDefault(); acceptAlliance(); }
+  if (event.code === 'Digit3') { event.preventDefault(); offerPlayerAlliance(); }
+  if (event.code === 'Digit4') { event.preventDefault(); betrayAlliances(); }
 });
 resize(); resetPlayer(); setupBots(); updateUi(12); requestAnimationFrame(frame);
