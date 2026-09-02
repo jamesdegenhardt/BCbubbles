@@ -29,8 +29,6 @@ const BOT_TARGET = 8;
 const MAX_CELLS = 80;
 const VIRUS_TARGET = 18;
 const GRID_SIZE = 100;
-const DECAY_THRESHOLD = 60;
-const DECAY_RATE = .018;
 const BOT_NAMES = ['Nova', 'Miso', 'Orbit', 'Kite', 'Pixel', 'Zest', 'Comet', 'Echo', 'Mochi', 'Vanta', 'Sprout', 'Rook'];
 const food = [];
 const cells = [];
@@ -109,7 +107,7 @@ function startGame() {
   player.name = nicknameInput.value.trim().slice(0, 14) || 'James'; player.color = randomColor(); player.skin = skinSelect.value; player.splitKills = 0; gameMode = modeSelect.value; player.team = gameMode === 'teams' ? TEAMS[0].name : null; if (gameMode === 'teams') player.color = TEAMS[0].color; document.body.dataset.theme = themeSelect.value; cells.length = 0; ejectedMass.length = 0; particles.length = 0; floatingText.length = 0; mothercells.length = 0; selectedCell = null; match.startedAt = performance.now(); match.peakMass = 12; match.kills = 0; match.food = 0; match.viruses = 0; achievements.clear(); spectatorFocus = null; spectatorFree = false; resetPlayer(); setupBots(); if (gameMode === 'experimental') for (let index = 0; index < 8; index += 1) createMothercell(); gameState = 'playing'; spectatorBar.hidden = true; menuScreen.hidden = true; gameOverScreen.hidden = true; startAudio();
 }
 function startSpectator() { gameMode = 'ffa'; cells.length = 0; ejectedMass.length = 0; setupBots(); spectatorFocus = bots[0]; spectatorFree = false; gameState = 'spectator'; menuScreen.hidden = true; gameOverScreen.hidden = true; spectatorBar.hidden = false; }
-function handoffPlayerControl() { const survivor = ownedCells(player).filter((cell) => cell !== player.controlledCell).sort((first, second) => second.targetMass - first.targetMass)[0]; if (!survivor) return false; if (player.controlledCell) player.controlledCell.aiControlled = true; survivor.aiControlled = false; player.controlledCell = survivor; selectedCell = null; emitBurst(survivor.x, survivor.y, player.color, 18, 150); addFloatingText(survivor.x, survivor.y, 'CONTROL TRANSFERRED', '#ffffff'); return true; }
+function handoffPlayerControl() { const survivor = ownedCells(player).sort((first, second) => second.targetMass - first.targetMass)[0]; if (!survivor) return false; for (const cell of ownedCells(player)) cell.aiControlled = cell !== survivor; survivor.aiControlled = false; player.controlledCell = survivor; selectedCell = null; emitBurst(survivor.x, survivor.y, player.color, 18, 150); addFloatingText(survivor.x, survivor.y, 'CONTROL TRANSFERRED', '#ffffff'); return true; }
 function unlockAchievement(id, title) { if (achievements.has(id)) return; achievements.add(id); achievementToast.textContent = `Achievement unlocked: ${title}`; achievementToast.hidden = false; setTimeout(() => { achievementToast.hidden = true; }, 2600); }
 function applyPowerup(cell, orb) { if (orb.type === 'speed') cell.speedBoost = 7; if (orb.type === 'magnet') cell.magnet = 8; if (orb.type === 'merge') { cell.instantMerge = true; for (const sibling of ownedCells(cell.owner)) sibling.mergeReadyAt = 0; } emitBurst(orb.x, orb.y, '#ffdc70', 16, 180); addFloatingText(cell.x, cell.y, orb.type === 'speed' ? 'SPEED SURGE' : orb.type === 'magnet' ? 'MASS MAGNET' : 'INSTANT MERGE', '#ffdc70'); playSound('eat', .8); }
 function updateMothercells(delta) { if (gameMode !== 'experimental') return; for (const mother of mothercells) { mother.timer -= delta; mother.pulse += delta * 2; if (mother.timer <= 0) { mother.timer = 1.4; const angle = Math.random() * Math.PI * 2; food.push({ x: clamp(mother.x + Math.cos(angle) * (mother.radius + 18), 20, WORLD.width - 20), y: clamp(mother.y + Math.sin(angle) * (mother.radius + 18), 20, WORLD.height - 20), radius: 6, color: '#ff9be8' }); } for (const cell of cells.slice()) if (cell.radius < mother.radius && distanceBetween(cell, mother) < mother.radius * 1.2) { emitBurst(cell.x, cell.y, '#ff75d4', 18, 200); addFloatingText(cell.x, cell.y, 'MOTHERCELL', '#ff75d4'); removeCell(cell); if (cell.owner === player) endGame('loss'); } } }
@@ -246,9 +244,9 @@ function update(delta, now) {
   const playerCenter = centroid(player); player.splitCooldown = Math.max(0, player.splitCooldown - delta);
   for (const cell of cells) {
     let directionX = 0; let directionY = 0;
-    if (cell.owner === player) {
+    if (cell.owner === player && cell === player.controlledCell) {
       const targetX = playerCenter.x + (pointer.active ? pointer.x - innerWidth / 2 : 0) / camera.zoom; const targetY = playerCenter.y + (pointer.active ? pointer.y - innerHeight / 2 : 0) / camera.zoom; const distance = Math.hypot(targetX - cell.x, targetY - cell.y); if (distance) { directionX = (targetX - cell.x) / distance; directionY = (targetY - cell.y) / distance; }
-    } else {
+    } else if (cell.owner !== player) {
       cell.stateTime -= delta; if (cell.stateTime <= 0 || !cell.target) { const decision = chooseBotTarget(cell); cell.state = decision.state; cell.target = decision.target; cell.stateTime = .35 + Math.random() * .6; }
       if (cell.target) { const targetX = cell.state === 'flee' ? cell.x * 2 - cell.target.x : cell.target.x; const targetY = cell.state === 'flee' ? cell.y * 2 - cell.target.y : cell.target.y; const distance = Math.hypot(targetX - cell.x, targetY - cell.y); if (distance) { directionX = (targetX - cell.x) / distance; directionY = (targetY - cell.y) / distance; } }
       botStrike(cell);
@@ -271,17 +269,12 @@ function update(delta, now) {
     cell.visualY = lerp(cell.visualY, cell.y, 1 - Math.pow(.00001, delta));
     cell.mass = lerp(cell.mass, cell.targetMass, 1 - Math.pow(.0001, delta));
     cell.decayNotice -= delta;
-    if (gameMode !== 'teams' && cell.targetMass > DECAY_THRESHOLD) {
-      const loss = Math.min(cell.targetMass - DECAY_THRESHOLD, (cell.targetMass - DECAY_THRESHOLD) * DECAY_RATE * delta);
-      cell.targetMass -= loss;
-      if (cell.decayNotice <= 0) { addFloatingText(cell.x, cell.y, `-${Math.max(1, Math.floor(loss))}`, '#ff9a72'); cell.decayNotice = 1.4; }
-    }
     cell.radius = radiusForMass(cell.mass);
     cell.visualRadius = lerp(cell.visualRadius, radiusForMass(cell.targetMass), 1 - Math.pow(.00001, delta));
     applyFood(cell);
   }
   updateMothercells(delta); separateSiblingCells(now); mergePlayerPieces(now); updateEjected(delta); updateEffects(delta); consumeCells();
-  const focus = spectatorFocus && ownedCells(spectatorFocus)[0] ? centroid(spectatorFocus) : centroid(player); if (gameState === 'spectator' && spectatorFree) { camera.x = clamp(camera.x, innerWidth / 2 / camera.zoom, WORLD.width - innerWidth / 2 / camera.zoom); camera.y = clamp(camera.y, innerHeight / 2 / camera.zoom, WORLD.height - innerHeight / 2 / camera.zoom); } else { camera.x = focus.x; camera.y = focus.y; } const totalMass = ownedCells(player).reduce((sum, cell) => sum + cell.targetMass, 0); match.peakMass = Math.max(match.peakMass, totalMass); camera.zoom = gameState === 'spectator' && spectatorFree ? camera.zoom : clamp(1.05 - Math.sqrt(Math.max(0, totalMass)) / 1200, .62, 1.05); updateUi(totalMass);
+  const focus = gameState === 'playing' && player.controlledCell ? player.controlledCell : spectatorFocus && ownedCells(spectatorFocus)[0] ? centroid(spectatorFocus) : centroid(player); if (gameState === 'spectator' && spectatorFree) { camera.x = clamp(camera.x, innerWidth / 2 / camera.zoom, WORLD.width - innerWidth / 2 / camera.zoom); camera.y = clamp(camera.y, innerHeight / 2 / camera.zoom, WORLD.height - innerHeight / 2 / camera.zoom); } else { camera.x = focus.x; camera.y = focus.y; } const totalMass = ownedCells(player).reduce((sum, cell) => sum + cell.targetMass, 0); match.peakMass = Math.max(match.peakMass, totalMass); camera.zoom = gameState === 'spectator' && spectatorFree ? camera.zoom : clamp(1.05 - Math.sqrt(Math.max(0, totalMass)) / 1200, .62, 1.05); updateUi(totalMass);
 }
 function updateUi(totalMass) {
   massValue.textContent = Math.floor(totalMass); scoreMass.textContent = Math.floor(totalMass); eatenValue.textContent = player.eaten; massProgress.style.width = `${Math.min(100, 5 + totalMass / 2)}%`; statusText.textContent = `${bots.length} rivals in arena`;
