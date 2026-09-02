@@ -38,11 +38,17 @@
               <option value="light">Light grid</option>
               <option value="retro">Retro scan</option>
             </select>
+            <label for="layout">Arena layout</label>
+            <select id="layout" name="layout">
+              <option value="open">Open field</option>
+              <option value="crossfire">Crossfire</option>
+              <option value="rings">Ring field</option>
+            </select>
           </div>
           <button type="submit">Enter the arena <span>↗</span></button>
         </form>
         <button class="secondary-button" id="menuSpectateButton" type="button">Watch the arena</button>
-        <p class="control-line">Mouse or touch to move · Space to split · W to eject mass</p>
+        <p class="control-line">Mouse or touch to move · Space split · W eject · Shift dash · E evolve</p>
       </div>
     </section>
 
@@ -82,6 +88,8 @@
     <section class="score-panel" aria-label="Player stats">
       <div class="stat-line"><span>mass</span><strong id="massValue">12</strong></div>
       <div class="stat-line"><span>health</span><strong id="healthValue">100%</strong></div>
+      <div class="stat-line"><span>streak</span><strong id="streakValue">0</strong></div>
+      <div class="stat-line"><span>evolution</span><strong id="evolutionValue">I</strong></div>
       <div class="stat-line"><span>cells eaten</span><strong id="eatenValue">0</strong></div>
       <div class="progress-track"><span id="massProgress"></span></div>
     </section>
@@ -95,7 +103,7 @@
     <button class="split-button" id="splitButton" type="button" aria-label="Split cell">Split <b>SPACE</b></button>
 
     <div class="status-pill"><span class="status-dot"></span><span id="statusText">Arena live</span><span id="gasStatus">Gas starts in 1:00</span></div>
-    <div class="cursor-hint">Move to steer <span>·</span> Space to split <span>·</span> M to merge selected</div>
+    <div class="cursor-hint">Move to steer <span>·</span> Space split <span>·</span> Shift dash <span>·</span> M merge</div>
   </main>
   <script src="game.js"></script>
 </body>
