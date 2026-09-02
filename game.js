@@ -25,14 +25,18 @@ const spectatorBar = document.getElementById('spectatorBar');
 const nextFocusButton = document.getElementById('nextFocusButton');
 const achievementToast = document.getElementById('achievementToast');
 const layoutSelect = document.getElementById('layout');
+const botCountSelect = document.getElementById('botCount');
+const arenaSizeSelect = document.getElementById('arenaSize');
 const streakValue = document.getElementById('streakValue');
 const evolutionValue = document.getElementById('evolutionValue');
+const teamPanel = document.getElementById('teamPanel');
+const teamMassValues = { Red: document.getElementById('redMass'), Green: document.getElementById('greenMass'), Blue: document.getElementById('blueMass') };
 const allianceButton = document.getElementById('allianceButton');
 const allianceRejectButton = document.getElementById('allianceRejectButton');
 const betrayButton = document.getElementById('betrayButton');
 
 const WORLD = { width: 5200, height: 3600 };
-const FOOD_TARGET = 420;
+const FOOD_TARGET = 620;
 const BOT_TARGET = 8;
 const MAX_CELLS = 80;
 const VIRUS_TARGET = 18;
@@ -69,6 +73,8 @@ const player = { id: 'player', name: 'James', color: `hsl(${Math.floor(Math.rand
 const pointer = { x: innerWidth / 2, y: innerHeight / 2, active: false };
 const camera = { x: WORLD.width / 2, y: WORLD.height / 2, zoom: 1 };
 const arena = { left: 0, top: 0, right: WORLD.width, bottom: WORLD.height };
+let worldSize = 'normal';
+let botTarget = BOT_TARGET;
 const weather = { type: 'clear', remaining: 28 };
 let gameState = 'menu';
 let gameMode = 'ffa';
@@ -80,6 +86,7 @@ let previousPointer = { x: 0, y: 0 };
 const match = { startedAt: 0, peakMass: 12, kills: 0, food: 0, viruses: 0 };
 let arenaLayout = 'open';
 let pendingAllianceOffer = null;
+let manualZoom = null;
 const achievements = new Set();
 let audioContext = null;
 const audio = { enabled: true };
@@ -97,7 +104,7 @@ function randomColor() { return `hsl(${Math.floor(Math.random() * 360)} 82% 62%)
 function randomSkin() { return ['neon', 'planet', 'geometry'][Math.floor(Math.random() * 3)]; }
 function randomFood() { const legendary = Math.random() < .025; return { x: 35 + Math.random() * (WORLD.width - 70), y: 35 + Math.random() * (WORLD.height - 70), radius: legendary ? 11 : 5 + Math.random() * 4, value: legendary ? 12 : 1, legendary, color: legendary ? '#ffd34e' : `hsl(${Math.floor(Math.random() * 360)} 90% 67%)` }; }
 function spawnPoint(margin = 180) { return { x: margin + Math.random() * (WORLD.width - margin * 2), y: margin + Math.random() * (WORLD.height - margin * 2) }; }
-function resetArena() { arena.left = 0; arena.top = 0; arena.right = WORLD.width; arena.bottom = WORLD.height; obstacles.length = 0; hazards.length = 0; blackholes.length = 0; currents.length = 0; portals.length = 0; if (arenaLayout === 'crossfire') { obstacles.push({ x: 2400, y: 1550, width: 400, height: 500 }); } if (arenaLayout === 'rings') { obstacles.push({ x: 2600, y: 1800, radius: 420 }, { x: 2600, y: 1800, radius: 180 }); } for (let index = 0; index < 7; index += 1) { const spawn = spawnPoint(260); hazards.push({ x: spawn.x, y: spawn.y, radius: 28, angle: Math.random() * Math.PI * 2, speed: 35 + Math.random() * 45, orbit: 80 + Math.random() * 150, originX: spawn.x, originY: spawn.y, pulse: Math.random() * 6 }); } for (let index = 0; index < 4; index += 1) { const spawn = spawnPoint(320); currents.push({ x: spawn.x, y: spawn.y, radius: 180, vx: Math.random() * 90 - 45, vy: Math.random() * 90 - 45, pulse: Math.random() * 6 }); } for (let index = 0; index < 3; index += 1) { const spawn = spawnPoint(420); blackholes.push({ x: spawn.x, y: spawn.y, radius: 70, pull: 190, type: index % 2 ? 'forward' : 'vortex', angle: Math.random() * Math.PI * 2, pulse: Math.random() * 6 }); } for (let index = 0; index < 3; index += 1) { const first = spawnPoint(360); const second = spawnPoint(360); portals.push({ x: first.x, y: first.y, radius: 32, pair: index }); portals.push({ x: second.x, y: second.y, radius: 32, pair: index }); } }
+function resetArena() { arena.left = 0; arena.top = 0; arena.right = WORLD.width; arena.bottom = WORLD.height; obstacles.length = 0; hazards.length = 0; blackholes.length = 0; currents.length = 0; portals.length = 0; if (arenaLayout === 'crossfire') obstacles.push({ x: WORLD.width * .46, y: WORLD.height * .43, width: WORLD.width * .08, height: WORLD.height * .14 }); if (arenaLayout === 'rings') obstacles.push({ x: WORLD.width / 2, y: WORLD.height / 2, radius: Math.min(WORLD.width, WORLD.height) * .12 }, { x: WORLD.width / 2, y: WORLD.height / 2, radius: Math.min(WORLD.width, WORLD.height) * .25 }); if (gameMode === 'maze') { for (let index = 1; index < 6; index += 1) obstacles.push({ x: index * WORLD.width / 6, y: index % 2 ? WORLD.height * .18 : WORLD.height * .58, width: WORLD.width / 3, height: WORLD.height * .07 }); } for (let index = 0; index < 7; index += 1) { const spawn = spawnPoint(260); hazards.push({ x: spawn.x, y: spawn.y, radius: 28, angle: Math.random() * Math.PI * 2, speed: 35 + Math.random() * 45, orbit: 80 + Math.random() * 150, originX: spawn.x, originY: spawn.y, pulse: Math.random() * 6 }); } for (let index = 0; index < 4; index += 1) { const spawn = spawnPoint(320); currents.push({ x: spawn.x, y: spawn.y, radius: 180, vx: Math.random() * 90 - 45, vy: Math.random() * 90 - 45, pulse: Math.random() * 6 }); } for (let index = 0; index < 3; index += 1) { const spawn = spawnPoint(420); blackholes.push({ x: spawn.x, y: spawn.y, radius: 70, pull: 190, type: index % 2 ? 'forward' : 'vortex', angle: Math.random() * Math.PI * 2, pulse: Math.random() * 6 }); } for (let index = 0; index < 3; index += 1) { const first = spawnPoint(360); const second = spawnPoint(360); portals.push({ x: first.x, y: first.y, radius: 32, pair: index }); portals.push({ x: second.x, y: second.y, radius: 32, pair: index }); } }
 function updateArena(elapsed) {
   if (elapsed < SHRINK_DELAY) return { phase: 'safe', remaining: SHRINK_DELAY - elapsed };
   const cycleTime = SHRINK_PHASE + SHRINK_PAUSE;
@@ -116,11 +123,11 @@ function updateHazards(delta) { for (const hazard of hazards) { hazard.angle += 
 function updateWeather(delta) { weather.remaining -= delta; if (weather.remaining <= 0) { weather.type = ['clear', 'wind', 'current', 'low-gravity'][Math.floor(Math.random() * 4)]; weather.remaining = 18 + Math.random() * 22; } }
 function allianceBetween(first, second) { return alliances.some((alliance) => ((alliance.first === first && alliance.second === second) || (alliance.first === second && alliance.second === first)) && alliance.until > performance.now() / 1000); }
 function livingOpponent(exclude = player) { return [player, ...bots].filter((owner) => owner !== exclude && ownedCells(owner).length); }
-function offerAlliance(from, to) { if (!to || from === to || allianceBetween(from, to) || allianceOffers.some((offer) => offer.from === from && offer.to === to)) return; allianceOffers.push({ from, to, expires: performance.now() / 1000 + 10 }); if (from === player) addFloatingText(player.controlledCell?.x || WORLD.width / 2, player.controlledCell?.y || WORLD.height / 2, `OFFER TO ${to.name}`, '#70a7ff'); }
+function offerAlliance(from, to) { if (gameMode === 'teams' || !to || from === to || allianceBetween(from, to) || allianceOffers.some((offer) => offer.from === from && offer.to === to)) return; allianceOffers.push({ from, to, expires: performance.now() / 1000 + 10 }); if (from === player) addFloatingText(player.controlledCell?.x || WORLD.width / 2, player.controlledCell?.y || WORLD.height / 2, `OFFER TO ${to.name}`, '#70a7ff'); }
 function resolveAllianceOffers(now) { for (let index = allianceOffers.length - 1; index >= 0; index -= 1) { const offer = allianceOffers[index]; if (offer.expires < now || !ownedCells(offer.to).length) { if (offer.to === player) pendingAllianceOffer = null; allianceOffers.splice(index, 1); continue; } if (offer.to === player) { pendingAllianceOffer = offer; continue; } if (offer.from === player) { if (Math.random() < .72) alliances.push({ first: player, second: offer.to, until: now + 75 }); allianceOffers.splice(index, 1); } else if (Math.random() < .55) { alliances.push({ first: offer.from, second: offer.to, until: now + 75 }); allianceOffers.splice(index, 1); } } for (let index = alliances.length - 1; index >= 0; index -= 1) if (alliances[index].until <= now) alliances.splice(index, 1); if (Math.random() < .006 && bots.length) { const from = bots[Math.floor(Math.random() * bots.length)]; const targets = livingOpponent(from); offerAlliance(from, targets[Math.floor(Math.random() * targets.length)]); } }
 function offerPlayerAlliance() { const candidates = livingOpponent(); const target = candidates[Math.floor(Math.random() * candidates.length)]; offerAlliance(player, target); }
 function betrayAlliances() { const now = performance.now() / 1000; const active = alliances.filter((alliance) => alliance.first === player || alliance.second === player); if (!active.length) return; alliances.splice(0, alliances.length, ...alliances.filter((alliance) => alliance.first !== player && alliance.second !== player)); player.betrayalUntil = now + 30; addFloatingText(player.controlledCell?.x || WORLD.width / 2, player.controlledCell?.y || WORLD.height / 2, 'BETRAYAL: HUNTED', '#ff6961'); }
-function acceptAlliance() { if (!pendingAllianceOffer) return; alliances.push({ first: pendingAllianceOffer.from, second: player, until: performance.now() / 1000 + 75 }); allianceOffers.splice(allianceOffers.indexOf(pendingAllianceOffer), 1); addFloatingText(player.controlledCell.x, player.controlledCell.y, 'ALLIANCE ACCEPTED', '#70a7ff'); pendingAllianceOffer = null; }
+function acceptAlliance() { if (gameMode === 'teams' || !pendingAllianceOffer) return; alliances.push({ first: pendingAllianceOffer.from, second: player, until: performance.now() / 1000 + 75 }); allianceOffers.splice(allianceOffers.indexOf(pendingAllianceOffer), 1); addFloatingText(player.controlledCell.x, player.controlledCell.y, 'ALLIANCE ACCEPTED', '#70a7ff'); pendingAllianceOffer = null; }
 function rejectAlliance() { if (!pendingAllianceOffer) return; allianceOffers.splice(allianceOffers.indexOf(pendingAllianceOffer), 1); pendingAllianceOffer = null; }
 function clampCameraToArena() {
   const halfWidth = innerWidth / 2 / camera.zoom; const halfHeight = innerHeight / 2 / camera.zoom;
@@ -160,10 +167,11 @@ function centroid(owner) {
 function resetPlayer() { player.eaten = 0; player.kills = 0; player.streak = 0; player.evolution = 1; player.splitCooldown = 0; player.controlledCell = createCell(player, WORLD.width / 2, WORLD.height / 2, 12); }
 function setupBots() {
   bots.length = 0;
-  for (let index = 0; index < BOT_TARGET; index += 1) { const team = TEAMS[index % 3]; const owner = { id: `bot-${index}`, name: BOT_NAMES[index % BOT_NAMES.length], color: gameMode === 'teams' ? team.color : randomColor(), skin: randomSkin(), tactic: Math.random(), team: gameMode === 'teams' ? team.name : null }; bots.push(owner); const spawn = spawnPoint(); createCell(owner, spawn.x, spawn.y, 15 + Math.random() * 28); }
+  for (let index = 0; index < botTarget; index += 1) { const team = TEAMS[index % 3]; const owner = { id: `bot-${index}`, name: BOT_NAMES[index % BOT_NAMES.length], color: gameMode === 'teams' ? team.color : randomColor(), skin: randomSkin(), tactic: Math.random(), team: gameMode === 'teams' ? team.name : null }; bots.push(owner); const spawn = spawnPoint(); createCell(owner, spawn.x, spawn.y, 15 + Math.random() * 28); }
 }
 function startGame() {
-  player.name = nicknameInput.value.trim().slice(0, 14) || 'James'; player.color = randomColor(); player.skin = skinSelect.value; player.splitKills = 0; gameMode = modeSelect.value; arenaLayout = layoutSelect.value; player.team = gameMode === 'teams' ? TEAMS[0].name : null; if (gameMode === 'teams') player.color = TEAMS[0].color; document.body.dataset.theme = themeSelect.value; cells.length = 0; ejectedMass.length = 0; particles.length = 0; floatingText.length = 0; mothercells.length = 0; alliances.length = 0; allianceOffers.length = 0; pendingAllianceOffer = null; player.betrayalUntil = 0; weather.type = 'clear'; weather.remaining = 28; selectedCell = null; resetArena(); match.startedAt = performance.now(); match.peakMass = 12; match.kills = 0; match.food = 0; match.viruses = 0; achievements.clear(); spectatorFocus = null; spectatorFree = false; resetPlayer(); setupBots(); if (gameMode === 'experimental') for (let index = 0; index < 8; index += 1) createMothercell(); gameState = 'playing'; spectatorBar.hidden = true; menuScreen.hidden = true; gameOverScreen.hidden = true; startAudio();
+  worldSize = arenaSizeSelect.value; botTarget = Number(botCountSelect.value); WORLD.width = worldSize === 'small' ? 3600 : worldSize === 'large' ? 7000 : 5200; WORLD.height = worldSize === 'small' ? 2500 : worldSize === 'large' ? 4800 : 3600;
+  player.name = nicknameInput.value.trim().slice(0, 14) || 'James'; player.color = randomColor(); player.skin = skinSelect.value; player.splitKills = 0; gameMode = modeSelect.value; arenaLayout = layoutSelect.value; manualZoom = null; player.team = gameMode === 'teams' ? TEAMS[0].name : null; if (gameMode === 'teams') player.color = TEAMS[0].color; document.body.dataset.theme = themeSelect.value; cells.length = 0; ejectedMass.length = 0; particles.length = 0; floatingText.length = 0; mothercells.length = 0; alliances.length = 0; allianceOffers.length = 0; pendingAllianceOffer = null; player.betrayalUntil = 0; weather.type = 'clear'; weather.remaining = 28; selectedCell = null; resetArena(); match.startedAt = performance.now(); match.peakMass = 12; match.kills = 0; match.food = 0; match.viruses = 0; achievements.clear(); spectatorFocus = null; spectatorFree = false; resetPlayer(); setupBots(); if (gameMode === 'experimental') for (let index = 0; index < 8; index += 1) createMothercell(); gameState = 'playing'; spectatorBar.hidden = true; menuScreen.hidden = true; gameOverScreen.hidden = true; startAudio();
 }
 function startSpectator() { gameMode = 'ffa'; cells.length = 0; ejectedMass.length = 0; resetArena(); setupBots(); spectatorFocus = bots[0]; spectatorFree = false; gameState = 'spectator'; menuScreen.hidden = true; gameOverScreen.hidden = true; spectatorBar.hidden = false; }
 function handoffPlayerControl() { const survivor = ownedCells(player).sort((first, second) => second.targetMass - first.targetMass)[0]; if (!survivor) return false; for (const cell of ownedCells(player)) cell.aiControlled = cell !== survivor; survivor.aiControlled = false; player.controlledCell = survivor; selectedCell = null; emitBurst(survivor.x, survivor.y, player.color, 18, 150); addFloatingText(survivor.x, survivor.y, 'CONTROL TRANSFERRED', '#ffffff'); return true; }
@@ -180,6 +188,8 @@ function endGame(result) {
   document.getElementById('reportPeak').textContent = Math.floor(match.peakMass); document.getElementById('reportKills').textContent = match.kills; document.getElementById('reportFood').textContent = match.food; document.getElementById('reportViruses').textContent = match.viruses;
   playSound(result === 'win' ? 'eat' : 'death', result === 'win' ? .8 : 1); emitBurst(camera.x, camera.y, result === 'win' ? '#a8f36d' : '#ff8b79', 36, 300);
 }
+function teamMass(teamName) { return ownedCells(player).filter((cell) => player.team === teamName).reduce((sum, cell) => sum + cell.targetMass, 0) + bots.filter((bot) => bot.team === teamName).reduce((sum, bot) => sum + ownedCells(bot).reduce((botMass, cell) => botMass + cell.targetMass, 0), 0); }
+function resolveTeamWinner() { const livingTeams = TEAMS.filter((team) => teamMass(team.name) > 0); if (livingTeams.length > 1) return; if (livingTeams.length === 1) endGame(player.team === livingTeams[0].name ? 'win' : 'loss'); }
 
 function nearestFood(cell) {
   let nearest = null; let nearestDistance = Infinity;
@@ -280,6 +290,7 @@ function consumeCells() {
   }
   for (const cell of cells.slice()) for (const virus of viruses) if (cell.radius > virus.radius * 1.1 && distanceBetween(cell, virus) < cell.radius - virus.radius * .2) { if (cell.owner === player) { match.viruses += 1; if (match.viruses >= 3) unlockAchievement('virus-buster', 'Virus Buster'); } popCell(cell, virus); break; }
   if (!ownedCells(player).length) endGame('loss');
+  else if (gameMode === 'teams') resolveTeamWinner();
   else if (bots.every((bot) => !ownedCells(bot).length)) endGame('win');
 }
 function mergePlayerPieces(now) {
@@ -383,14 +394,17 @@ function update(delta, now) {
     if (applyGasDamage(cell, delta) || applyHazardDamage(cell, delta)) continue;
   }
   updateMothercells(delta); mergePlayerPieces(now); updateEjected(delta); updateEffects(delta); consumeCells();
-  const focus = gameState === 'playing' && player.controlledCell ? player.controlledCell : spectatorFocus && ownedCells(spectatorFocus)[0] ? centroid(spectatorFocus) : centroid(player); if (gameState === 'spectator' && spectatorFree) clampCameraToArena(); else { camera.x = focus.x; camera.y = focus.y; } const totalMass = ownedCells(player).reduce((sum, cell) => sum + cell.targetMass, 0); match.peakMass = Math.max(match.peakMass, totalMass); camera.zoom = gameState === 'spectator' && spectatorFree ? camera.zoom : clamp(1.05 - Math.sqrt(Math.max(0, totalMass)) / 1200, .62, 1.05); updateUi(totalMass, gasPhase);
+  const focus = gameState === 'playing' && player.controlledCell ? player.controlledCell : spectatorFocus && ownedCells(spectatorFocus)[0] ? centroid(spectatorFocus) : centroid(player); if (gameState === 'spectator' && spectatorFree) clampCameraToArena(); else { camera.x = focus.x; camera.y = focus.y; } const totalMass = ownedCells(player).reduce((sum, cell) => sum + cell.targetMass, 0); match.peakMass = Math.max(match.peakMass, totalMass); const automaticZoom = clamp(1.05 - Math.sqrt(Math.max(0, totalMass)) / 1200, .62, 1.05); camera.zoom = gameState === 'spectator' && spectatorFree ? camera.zoom : manualZoom || automaticZoom; updateUi(totalMass, gasPhase);
 }
 function updateUi(totalMass, gasPhase = { phase: 'safe', remaining: 0 }) {
   const livingBots = bots.filter((bot) => ownedCells(bot).length);
+  if (gameMode === 'teams') pendingAllianceOffer = null;
+  teamPanel.hidden = gameMode !== 'teams';
+  for (const team of TEAMS) teamMassValues[team.name].textContent = Math.floor(teamMass(team.name));
   const controlledHealth = player.controlledCell ? Math.ceil(player.controlledCell.health) : 0;
   const seconds = Math.max(0, Math.ceil(gasPhase.remaining));
   const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-  massValue.textContent = Math.floor(totalMass); scoreMass.textContent = Math.floor(totalMass); healthValue.textContent = `${controlledHealth}%`; streakValue.textContent = player.streak; evolutionValue.textContent = ['I', 'II', 'III', 'IV', 'V'][player.evolution - 1]; eatenValue.textContent = player.eaten; massProgress.style.width = `${Math.min(100, 5 + totalMass / 2)}%`; statusText.textContent = `${livingBots.length} rivals in arena${player.betrayalUntil > performance.now() / 1000 ? ' · HUNTED' : ''}${weather.type !== 'clear' ? ` · ${weather.type.toUpperCase()}` : ''}`; gasStatus.textContent = pendingAllianceOffer ? `Alliance from ${pendingAllianceOffer.from.name}` : gasPhase.phase === 'safe' ? `Gas starts in ${clock}` : gasPhase.phase === 'shrinking' ? `Gas advances ${clock}` : gasPhase.phase === 'pause' ? `Gas pauses ${clock}` : 'Gas settled'; allianceButton.textContent = pendingAllianceOffer ? 'Accept alliance' : 'Offer alliance'; allianceRejectButton.hidden = !pendingAllianceOffer;
+  massValue.textContent = Math.floor(totalMass); scoreMass.textContent = Math.floor(totalMass); healthValue.textContent = `${controlledHealth}%`; streakValue.textContent = player.streak; evolutionValue.textContent = ['I', 'II', 'III', 'IV', 'V'][player.evolution - 1]; eatenValue.textContent = player.eaten; massProgress.style.width = `${Math.min(100, 5 + totalMass / 2)}%`; statusText.textContent = `${livingBots.length} rivals in arena${player.betrayalUntil > performance.now() / 1000 ? ' · HUNTED' : ''}${weather.type !== 'clear' ? ` · ${weather.type.toUpperCase()}` : ''}`; gasStatus.textContent = pendingAllianceOffer ? `Alliance from ${pendingAllianceOffer.from.name}` : gasPhase.phase === 'safe' ? `Gas starts in ${clock}` : gasPhase.phase === 'shrinking' ? `Gas advances ${clock}` : gasPhase.phase === 'pause' ? `Gas pauses ${clock}` : 'Gas settled'; allianceButton.textContent = pendingAllianceOffer ? 'Accept alliance' : 'Offer alliance'; allianceButton.hidden = gameMode === 'teams'; allianceRejectButton.hidden = gameMode === 'teams' || !pendingAllianceOffer; betrayButton.hidden = gameMode === 'teams';
   const rankings = [player, ...livingBots].map((owner) => ({ owner, mass: ownedCells(owner).reduce((sum, cell) => sum + cell.targetMass, 0) })).sort((first, second) => second.mass - first.mass).slice(0, 10);
   if (gameState === 'playing' && rankings[0]?.owner === player) unlockAchievement('apex', 'Apex Predator');
   leaderboardList.innerHTML = rankings.map((entry) => `<li class="${entry.owner === player ? 'is-player' : ''}"><strong>${entry.owner.name}</strong><em>${Math.floor(entry.mass)}</em></li>`).join('');
@@ -469,7 +483,7 @@ allianceRejectButton.addEventListener('click', (event) => { event.stopPropagatio
 betrayButton.addEventListener('click', (event) => { event.stopPropagation(); betrayAlliances(); });
 let lastTouchAt = 0;
 addEventListener('resize', resize); addEventListener('pointermove', (event) => { if (gameState === 'spectator' && spectatorDrag) { camera.x -= (event.clientX - previousPointer.x) / camera.zoom; camera.y -= (event.clientY - previousPointer.y) / camera.zoom; spectatorFocus = null; spectatorFree = true; } pointer.x = event.clientX; pointer.y = event.clientY; previousPointer = { x: event.clientX, y: event.clientY }; pointer.active = true; }); addEventListener('pointerdown', (event) => { if (event.target.closest('button, input, select')) return; pointer.x = event.clientX; pointer.y = event.clientY; previousPointer = { x: event.clientX, y: event.clientY }; pointer.active = true; if (gameState === 'spectator') spectatorDrag = true; if (gameState === 'playing' && event.pointerType !== 'touch') { const clicked = cellAtScreenPoint(event.clientX, event.clientY); if (clicked) { if (selectedCell && selectedCell !== clicked) mergeSelectedCell(performance.now() / 1000); else selectedCell = clicked; } else { const bot = cellAtAnyScreenPoint(event.clientX, event.clientY); if (bot) offerAlliance(player, bot.owner); } } if (event.pointerType === 'touch' && performance.now() - lastTouchAt < 350) splitPlayer(); lastTouchAt = performance.now(); }); addEventListener('pointerup', () => { spectatorDrag = false; }); addEventListener('pointerleave', () => { pointer.active = false; spectatorDrag = false; });
-addEventListener('wheel', (event) => { if (gameState !== 'playing' && gameState !== 'spectator') return; event.preventDefault(); camera.zoom = clamp(camera.zoom * (event.deltaY > 0 ? .9 : 1.1), .35, 2.2); if (gameState === 'spectator') { spectatorFocus = null; spectatorFree = true; } }, { passive: false });
+addEventListener('wheel', (event) => { if (gameState !== 'playing' && gameState !== 'spectator') return; event.preventDefault(); manualZoom = clamp((manualZoom || camera.zoom) * (event.deltaY > 0 ? .9 : 1.1), .35, 2.2); camera.zoom = manualZoom; if (gameState === 'spectator') { spectatorFocus = null; spectatorFree = true; } }, { passive: false });
 addEventListener('keydown', (event) => {
   if (event.code === 'Space') {
     event.preventDefault();

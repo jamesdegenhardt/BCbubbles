@@ -67,8 +67,7 @@ body {
   display: flex; align-items: center; gap: 12px; pointer-events: none;
 }
 .brand-mark {
-  display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid rgba(168, 243, 109, .75);
-  border-radius: 50%; color: #071019; background: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .04em;
+  display: block; width: 42px; height: 42px; border: 1px solid rgba(168, 243, 109, .75); border-radius: 10px; box-shadow: 0 0 18px rgba(168,243,109,.24);
 }
 h1 { margin: 0; font-size: 18px; line-height: 1; letter-spacing: -.03em; }
 .brand-lockup p { margin: 5px 0 0; color: var(--muted); font: 11px 'DM Mono', monospace; }
@@ -76,12 +75,20 @@ h1 { margin: 0; font-size: 18px; line-height: 1; letter-spacing: -.03em; }
   top: clamp(20px, 4vw, 48px); right: clamp(20px, 4vw, 56px); width: 156px; padding: 14px 15px 13px;
   background: var(--panel); border: 1px solid var(--line); border-radius: 8px; backdrop-filter: blur(12px);
 }
+.score-icon { display: block; width: 42px; height: 42px; margin: -3px auto 8px; border-radius: 10px; box-shadow: 0 0 18px rgba(168,243,109,.24); }
 .stat-line { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px; }
 .stat-line span { color: var(--muted); font: 10px 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .08em; }
 .stat-line strong { font-size: 18px; font-weight: 500; }
 .progress-track { height: 3px; margin-top: 11px; overflow: hidden; background: rgba(255,255,255,.1); border-radius: 3px; }
 .progress-track span { display: block; width: 5%; height: 100%; background: var(--accent); transition: width .25s ease; }
 .leaderboard { top: 172px; right: clamp(20px, 4vw, 56px); width: 206px; padding: 13px 15px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); backdrop-filter: blur(12px); }
+.team-panel { position: absolute; z-index: 2; top: 172px; left: clamp(20px, 4vw, 56px); width: 156px; padding: 13px 15px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); backdrop-filter: blur(12px); }
+.team-panel[hidden] { display: none; }
+.team-score { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; font-size: 12px; }
+.team-score strong { font-weight: 500; }
+.team-red { color: #ff6961; }
+.team-green { color: #77dd77; }
+.team-blue { color: #70a7ff; }
 .leaderboard-heading { display: flex; justify-content: space-between; margin-bottom: 9px; color: var(--ink); font: 10px 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .08em; }
 .live-label { color: var(--accent); }
 .leaderboard ol { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; counter-reset: rank; }
@@ -116,6 +123,7 @@ h1 { margin: 0; font-size: 18px; line-height: 1; letter-spacing: -.03em; }
   .score-panel { top: 20px; right: 20px; width: 136px; }
   .cursor-hint { display: none; }
   .leaderboard { top: 142px; right: 20px; width: 170px; }
+  .team-panel { top: 142px; left: 20px; width: 136px; }
   .score-counter { bottom: 20px; left: 20px; }
   .split-button { display: block; right: 20px; bottom: 20px; }
   .alliance-button, .betray-button { right: 20px; display: block; }

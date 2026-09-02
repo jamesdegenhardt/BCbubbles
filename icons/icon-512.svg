@@ -9,5 +9,6 @@
   <circle cx="256" cy="256" r="128" fill="url(#cell)" stroke="#f4ffcf" stroke-width="10" filter="url(#glow)"/>
   <path d="M168 240c45-64 120-83 188-40-24 75-98 131-179 112-19-5-24-42-9-72Z" fill="#d8ff9a" fill-opacity=".32"/>
   <circle cx="202" cy="189" r="24" fill="#fff" fill-opacity=".7"/>
-  <text x="256" y="287" fill="#071019" font-family="sans-serif" font-size="68" font-weight="800" text-anchor="middle">BC</text>
+  <text x="256" y="280" fill="#071019" font-family="sans-serif" font-size="68" font-weight="800" text-anchor="middle">BC</text>
+  <text x="256" y="335" fill="#f4ffcf" font-family="sans-serif" font-size="27" font-weight="700" letter-spacing="4" text-anchor="middle">BUBBLES</text>
 </svg>

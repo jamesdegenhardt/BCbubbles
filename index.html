@@ -33,6 +33,7 @@
               <option value="ffa">Free For All</option>
               <option value="teams">Teams Mode</option>
               <option value="experimental">Experimental Mode</option>
+              <option value="maze">Maze Arena</option>
             </select>
             <label for="skin">Cell skin</label>
             <select id="skin" name="skin">
@@ -51,6 +52,18 @@
               <option value="open">Open field</option>
               <option value="crossfire">Crossfire</option>
               <option value="rings">Ring field</option>
+            </select>
+            <label for="botCount">Bot count</label>
+            <select id="botCount" name="botCount">
+              <option value="4">4 bots</option>
+              <option value="8" selected>8 bots</option>
+              <option value="12">12 bots</option>
+            </select>
+            <label for="arenaSize">Arena size</label>
+            <select id="arenaSize" name="arenaSize">
+              <option value="small">Small</option>
+              <option value="normal" selected>Normal</option>
+              <option value="large">Large</option>
             </select>
           </div>
           <button type="submit">Enter the arena <span>↗</span></button>
@@ -87,7 +100,7 @@
     <div class="achievement-toast" id="achievementToast" role="status" aria-live="polite" hidden></div>
 
     <header class="brand-lockup" aria-label="Game title and creator">
-      <div class="brand-mark">BC</div>
+      <img class="brand-mark" src="icons/icon-192.svg" alt="BCbubbles">
       <div>
         <h1>BCbubbles</h1>
         <p>by James Degenhardt</p>
@@ -95,12 +108,20 @@
     </header>
 
     <section class="score-panel" aria-label="Player stats">
+      <img class="score-icon" src="icons/icon-192.svg" alt="BCbubbles">
       <div class="stat-line"><span>mass</span><strong id="massValue">12</strong></div>
       <div class="stat-line"><span>health</span><strong id="healthValue">100%</strong></div>
       <div class="stat-line"><span>streak</span><strong id="streakValue">0</strong></div>
       <div class="stat-line"><span>evolution</span><strong id="evolutionValue">I</strong></div>
       <div class="stat-line"><span>cells eaten</span><strong id="eatenValue">0</strong></div>
       <div class="progress-track"><span id="massProgress"></span></div>
+    </section>
+
+    <section class="team-panel" id="teamPanel" aria-label="Team scores" hidden>
+      <div class="leaderboard-heading"><span>Team mass</span><span class="live-label">Live</span></div>
+      <div class="team-score"><span class="team-red">Red</span><strong id="redMass">0</strong></div>
+      <div class="team-score"><span class="team-green">Green</span><strong id="greenMass">0</strong></div>
+      <div class="team-score"><span class="team-blue">Blue</span><strong id="blueMass">0</strong></div>
     </section>
 
     <section class="leaderboard" aria-label="Leaderboard">
