@@ -30,6 +30,10 @@ const MAX_CELLS = 80;
 const VIRUS_TARGET = 18;
 const GRID_SIZE = 100;
 const MIN_CELL_GROWTH = 12;
+const SHRINK_DELAY = 60;
+const SHRINK_PHASE = 20;
+const SHRINK_PAUSE = 20;
+const SHRINK_CYCLES = 3;
 const BOT_NAMES = ['Nova', 'Miso', 'Orbit', 'Kite', 'Pixel', 'Zest', 'Comet', 'Echo', 'Mochi', 'Vanta', 'Sprout', 'Rook'];
 const food = [];
 const cells = [];
@@ -44,6 +48,7 @@ const TEAMS = [{ name: 'Red', color: '#ff6961' }, { name: 'Green', color: '#77dd
 const player = { id: 'player', name: 'James', color: `hsl(${Math.floor(Math.random() * 360)} 82% 62%)`, skin: 'neon', eaten: 0, splitCooldown: 0, splitKills: 0, controlledCell: null };
 const pointer = { x: innerWidth / 2, y: innerHeight / 2, active: false };
 const camera = { x: WORLD.width / 2, y: WORLD.height / 2, zoom: 1 };
+const arena = { left: 0, top: 0, right: WORLD.width, bottom: WORLD.height };
 let gameState = 'menu';
 let gameMode = 'ffa';
 let spectatorFocus = null;
@@ -69,6 +74,20 @@ function randomColor() { return `hsl(${Math.floor(Math.random() * 360)} 82% 62%)
 function randomSkin() { return ['neon', 'planet', 'geometry'][Math.floor(Math.random() * 3)]; }
 function randomFood() { return { x: 35 + Math.random() * (WORLD.width - 70), y: 35 + Math.random() * (WORLD.height - 70), radius: 5 + Math.random() * 4, color: `hsl(${Math.floor(Math.random() * 360)} 90% 67%)` }; }
 function spawnPoint(margin = 180) { return { x: margin + Math.random() * (WORLD.width - margin * 2), y: margin + Math.random() * (WORLD.height - margin * 2) }; }
+function resetArena() { arena.left = 0; arena.top = 0; arena.right = WORLD.width; arena.bottom = WORLD.height; }
+function updateArena(elapsed) {
+  if (elapsed < SHRINK_DELAY) return;
+  const cycleTime = SHRINK_PHASE + SHRINK_PAUSE;
+  const cycleProgress = clamp((elapsed - SHRINK_DELAY) / cycleTime, 0, SHRINK_CYCLES);
+  const inset = Math.min(WORLD.width, WORLD.height) * .45 * cycleProgress / SHRINK_CYCLES;
+  arena.left = inset; arena.top = inset; arena.right = WORLD.width - inset; arena.bottom = WORLD.height - inset;
+}
+function arenaCenter() { return { x: (arena.left + arena.right) / 2, y: (arena.top + arena.bottom) / 2 }; }
+function clampCameraToArena() {
+  const halfWidth = innerWidth / 2 / camera.zoom; const halfHeight = innerHeight / 2 / camera.zoom;
+  camera.x = arena.right - arena.left <= halfWidth * 2 ? (arena.left + arena.right) / 2 : clamp(camera.x, arena.left + halfWidth, arena.right - halfWidth);
+  camera.y = arena.bottom - arena.top <= halfHeight * 2 ? (arena.top + arena.bottom) / 2 : clamp(camera.y, arena.top + halfHeight, arena.bottom - halfHeight);
+}
 function startAudio() { if (!audio.enabled) return; const AudioEngine = window.AudioContext || window.webkitAudioContext; if (!AudioEngine) return; if (!audioContext) audioContext = new AudioEngine(); if (audioContext.state === 'suspended') audioContext.resume(); }
 function playSound(type, intensity = 1) {
   if (!audioContext || !audio.enabled) return;
@@ -105,9 +124,9 @@ function setupBots() {
   for (let index = 0; index < BOT_TARGET; index += 1) { const team = TEAMS[index % 3]; const owner = { id: `bot-${index}`, name: BOT_NAMES[index % BOT_NAMES.length], color: gameMode === 'teams' ? team.color : randomColor(), skin: randomSkin(), tactic: Math.random(), team: gameMode === 'teams' ? team.name : null }; bots.push(owner); const spawn = spawnPoint(); createCell(owner, spawn.x, spawn.y, 15 + Math.random() * 28); }
 }
 function startGame() {
-  player.name = nicknameInput.value.trim().slice(0, 14) || 'James'; player.color = randomColor(); player.skin = skinSelect.value; player.splitKills = 0; gameMode = modeSelect.value; player.team = gameMode === 'teams' ? TEAMS[0].name : null; if (gameMode === 'teams') player.color = TEAMS[0].color; document.body.dataset.theme = themeSelect.value; cells.length = 0; ejectedMass.length = 0; particles.length = 0; floatingText.length = 0; mothercells.length = 0; selectedCell = null; match.startedAt = performance.now(); match.peakMass = 12; match.kills = 0; match.food = 0; match.viruses = 0; achievements.clear(); spectatorFocus = null; spectatorFree = false; resetPlayer(); setupBots(); if (gameMode === 'experimental') for (let index = 0; index < 8; index += 1) createMothercell(); gameState = 'playing'; spectatorBar.hidden = true; menuScreen.hidden = true; gameOverScreen.hidden = true; startAudio();
+  player.name = nicknameInput.value.trim().slice(0, 14) || 'James'; player.color = randomColor(); player.skin = skinSelect.value; player.splitKills = 0; gameMode = modeSelect.value; player.team = gameMode === 'teams' ? TEAMS[0].name : null; if (gameMode === 'teams') player.color = TEAMS[0].color; document.body.dataset.theme = themeSelect.value; cells.length = 0; ejectedMass.length = 0; particles.length = 0; floatingText.length = 0; mothercells.length = 0; selectedCell = null; resetArena(); match.startedAt = performance.now(); match.peakMass = 12; match.kills = 0; match.food = 0; match.viruses = 0; achievements.clear(); spectatorFocus = null; spectatorFree = false; resetPlayer(); setupBots(); if (gameMode === 'experimental') for (let index = 0; index < 8; index += 1) createMothercell(); gameState = 'playing'; spectatorBar.hidden = true; menuScreen.hidden = true; gameOverScreen.hidden = true; startAudio();
 }
-function startSpectator() { gameMode = 'ffa'; cells.length = 0; ejectedMass.length = 0; setupBots(); spectatorFocus = bots[0]; spectatorFree = false; gameState = 'spectator'; menuScreen.hidden = true; gameOverScreen.hidden = true; spectatorBar.hidden = false; }
+function startSpectator() { gameMode = 'ffa'; cells.length = 0; ejectedMass.length = 0; resetArena(); setupBots(); spectatorFocus = bots[0]; spectatorFree = false; gameState = 'spectator'; menuScreen.hidden = true; gameOverScreen.hidden = true; spectatorBar.hidden = false; }
 function handoffPlayerControl() { const survivor = ownedCells(player).sort((first, second) => second.targetMass - first.targetMass)[0]; if (!survivor) return false; for (const cell of ownedCells(player)) cell.aiControlled = cell !== survivor; survivor.aiControlled = false; player.controlledCell = survivor; selectedCell = null; emitBurst(survivor.x, survivor.y, player.color, 18, 150); addFloatingText(survivor.x, survivor.y, 'CONTROL TRANSFERRED', '#ffffff'); return true; }
 function unlockAchievement(id, title) { if (achievements.has(id)) return; achievements.add(id); achievementToast.textContent = `Achievement unlocked: ${title}`; achievementToast.hidden = false; setTimeout(() => { achievementToast.hidden = true; }, 2600); }
 function applyPowerup(cell, orb) { if (orb.type === 'speed') cell.speedBoost = 7; if (orb.type === 'magnet') cell.magnet = 8; if (orb.type === 'merge') { cell.instantMerge = true; for (const sibling of ownedCells(cell.owner)) sibling.mergeReadyAt = 0; } emitBurst(orb.x, orb.y, '#ffdc70', 16, 180); addFloatingText(cell.x, cell.y, orb.type === 'speed' ? 'SPEED SURGE' : orb.type === 'magnet' ? 'MASS MAGNET' : 'INSTANT MERGE', '#ffdc70'); playSound('eat', .8); }
@@ -166,7 +185,7 @@ function consumeCells() {
     for (let preyIndex = cells.length - 1; preyIndex >= 0; preyIndex -= 1) {
       const prey = cells[preyIndex];
       if (predator === prey || predator.owner === prey.owner || (gameMode === 'teams' && predator.owner.team && predator.owner.team === prey.owner.team) || predator.mass < prey.mass * 1.1) continue;
-      if (distanceBetween(predator, prey) < predator.radius - prey.radius * .3) { predator.targetMass += Math.max(prey.mass, MIN_CELL_GROWTH); if (predator.owner === player) { player.eaten += 1; match.kills += 1; if (ownedCells(player).length > 1) { player.splitKills += 1; if (player.splitKills >= 10) unlockAchievement('split-specialist', 'Split Specialist'); } } const wasControlled = prey === player.controlledCell; emitBurst(prey.x, prey.y, prey.color, 12, 160); addFloatingText(predator.x, predator.y, `+${Math.floor(prey.mass)}`); playSound('eat'); removeCell(prey); if (wasControlled && !handoffPlayerControl()) endGame('loss'); break; }
+      if (distanceBetween(predator, prey) < predator.radius - prey.radius * .3) { const growth = Math.max(prey.mass, MIN_CELL_GROWTH) * (1 + predator.mass / 100); predator.targetMass += growth; if (predator.owner === player) { player.eaten += 1; match.kills += 1; if (ownedCells(player).length > 1) { player.splitKills += 1; if (player.splitKills >= 10) unlockAchievement('split-specialist', 'Split Specialist'); } } const wasControlled = prey === player.controlledCell; emitBurst(prey.x, prey.y, prey.color, 12, 160); addFloatingText(predator.x, predator.y, `+${Math.floor(growth)}`); playSound('eat'); removeCell(prey); if (wasControlled && !handoffPlayerControl()) endGame('loss'); break; }
     }
   }
   for (const cell of cells.slice()) for (const virus of viruses) if (cell.radius > virus.radius * 1.1 && distanceBetween(cell, virus) < cell.radius - virus.radius * .2) { if (cell.owner === player) { match.viruses += 1; if (match.viruses >= 3) unlockAchievement('virus-buster', 'Virus Buster'); } popCell(cell, virus); break; }
@@ -234,6 +253,7 @@ function updateEjected(delta) {
 
 function update(delta, now) {
   if (gameState !== 'playing' && gameState !== 'spectator') return;
+  if (gameState === 'playing') updateArena((performance.now() - match.startedAt) / 1000);
   const playerCenter = centroid(player); player.splitCooldown = Math.max(0, player.splitCooldown - delta);
   for (const cell of cells) {
     let directionX = 0; let directionY = 0;
@@ -256,8 +276,8 @@ function update(delta, now) {
     cell.vx = lerp(cell.vx, directionX * speed + cell.impulseX, steering);
     cell.vy = lerp(cell.vy, directionY * speed + cell.impulseY, steering);
     cell.impulseX *= Math.pow(.002, delta); cell.impulseY *= Math.pow(.002, delta);
-    cell.x = clamp(cell.x + cell.vx * delta, cell.radius, WORLD.width - cell.radius);
-    cell.y = clamp(cell.y + cell.vy * delta, cell.radius, WORLD.height - cell.radius);
+    cell.x = clamp(cell.x + cell.vx * delta, arena.left + cell.radius, arena.right - cell.radius);
+    cell.y = clamp(cell.y + cell.vy * delta, arena.top + cell.radius, arena.bottom - cell.radius);
     cell.visualX = lerp(cell.visualX, cell.x, 1 - Math.pow(.00001, delta));
     cell.visualY = lerp(cell.visualY, cell.y, 1 - Math.pow(.00001, delta));
     cell.mass = lerp(cell.mass, cell.targetMass, 1 - Math.pow(.0001, delta));
@@ -267,11 +287,12 @@ function update(delta, now) {
     applyFood(cell);
   }
   updateMothercells(delta); mergePlayerPieces(now); updateEjected(delta); updateEffects(delta); consumeCells();
-  const focus = gameState === 'playing' && player.controlledCell ? player.controlledCell : spectatorFocus && ownedCells(spectatorFocus)[0] ? centroid(spectatorFocus) : centroid(player); if (gameState === 'spectator' && spectatorFree) { camera.x = clamp(camera.x, innerWidth / 2 / camera.zoom, WORLD.width - innerWidth / 2 / camera.zoom); camera.y = clamp(camera.y, innerHeight / 2 / camera.zoom, WORLD.height - innerHeight / 2 / camera.zoom); } else { camera.x = focus.x; camera.y = focus.y; } const totalMass = ownedCells(player).reduce((sum, cell) => sum + cell.targetMass, 0); match.peakMass = Math.max(match.peakMass, totalMass); camera.zoom = gameState === 'spectator' && spectatorFree ? camera.zoom : clamp(1.05 - Math.sqrt(Math.max(0, totalMass)) / 1200, .62, 1.05); updateUi(totalMass);
+  const focus = gameState === 'playing' && player.controlledCell ? player.controlledCell : spectatorFocus && ownedCells(spectatorFocus)[0] ? centroid(spectatorFocus) : centroid(player); if (gameState === 'spectator' && spectatorFree) clampCameraToArena(); else { camera.x = focus.x; camera.y = focus.y; } const totalMass = ownedCells(player).reduce((sum, cell) => sum + cell.targetMass, 0); match.peakMass = Math.max(match.peakMass, totalMass); camera.zoom = gameState === 'spectator' && spectatorFree ? camera.zoom : clamp(1.05 - Math.sqrt(Math.max(0, totalMass)) / 1200, .62, 1.05); updateUi(totalMass);
 }
 function updateUi(totalMass) {
-  massValue.textContent = Math.floor(totalMass); scoreMass.textContent = Math.floor(totalMass); eatenValue.textContent = player.eaten; massProgress.style.width = `${Math.min(100, 5 + totalMass / 2)}%`; statusText.textContent = `${bots.length} rivals in arena`;
-  const rankings = [player, ...bots].map((owner) => ({ owner, mass: ownedCells(owner).reduce((sum, cell) => sum + cell.targetMass, 0) })).sort((first, second) => second.mass - first.mass).slice(0, 10);
+  const livingBots = bots.filter((bot) => ownedCells(bot).length);
+  massValue.textContent = Math.floor(totalMass); scoreMass.textContent = Math.floor(totalMass); eatenValue.textContent = player.eaten; massProgress.style.width = `${Math.min(100, 5 + totalMass / 2)}%`; statusText.textContent = `${livingBots.length} rivals in arena`;
+  const rankings = [player, ...livingBots].map((owner) => ({ owner, mass: ownedCells(owner).reduce((sum, cell) => sum + cell.targetMass, 0) })).sort((first, second) => second.mass - first.mass).slice(0, 10);
   if (gameState === 'playing' && rankings[0]?.owner === player) unlockAchievement('apex', 'Apex Predator');
   leaderboardList.innerHTML = rankings.map((entry) => `<li class="${entry.owner === player ? 'is-player' : ''}"><strong>${entry.owner.name}</strong><em>${Math.floor(entry.mass)}</em></li>`).join('');
 }
@@ -305,7 +326,7 @@ function drawMinimap(width, height) {
 }
 function draw() {
   const width = innerWidth; const height = innerHeight; const theme = document.body.dataset.theme || 'dark'; const background = theme === 'light' ? '#dfeadd' : theme === 'retro' ? '#160d28' : '#071019'; context.clearRect(0, 0, width, height); context.fillStyle = background; context.fillRect(0, 0, width, height); const glow = context.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height) * .72); glow.addColorStop(0, theme === 'light' ? 'rgba(135, 183, 137, .3)' : theme === 'retro' ? 'rgba(121, 52, 152, .28)' : 'rgba(22, 55, 60, .42)'); glow.addColorStop(1, 'rgba(7, 16, 25, 0)'); context.fillStyle = glow; context.fillRect(0, 0, width, height);
-  context.save(); context.translate(width / 2, height / 2); context.scale(camera.zoom, camera.zoom); context.translate(-camera.x, -camera.y); drawGrid(width, height); context.strokeStyle = 'rgba(168, 243, 109, .55)'; context.lineWidth = 12; context.strokeRect(0, 0, WORLD.width, WORLD.height);
+  context.save(); context.translate(width / 2, height / 2); context.scale(camera.zoom, camera.zoom); context.translate(-camera.x, -camera.y); drawGrid(width, height); context.strokeStyle = 'rgba(168, 243, 109, .55)'; context.lineWidth = 12; context.strokeRect(arena.left, arena.top, arena.right - arena.left, arena.bottom - arena.top);
   for (const pellet of food) { context.beginPath(); context.fillStyle = pellet.color; context.shadowColor = pellet.color; context.shadowBlur = 10; context.arc(pellet.x, pellet.y, pellet.radius, 0, Math.PI * 2); context.fill(); context.shadowBlur = 0; }
   for (const virus of viruses) drawVirus(virus);
   for (const mother of mothercells) drawMothercell(mother);
