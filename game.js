@@ -43,7 +43,7 @@ const VIRUS_TARGET = 18;
 const GRID_SIZE = 100;
 const MIN_CELL_GROWTH = 12;
 const SHRINK_DELAY = 60;
-const SHRINK_PHASE = 40;
+const SHRINK_PHASE = 560;
 const SHRINK_PAUSE = 20;
 const SHRINK_CYCLES = 3;
 const GAS_DAMAGE_RATE = 7;
@@ -173,7 +173,7 @@ function setupBots() {
   for (let index = 0; index < botTarget; index += 1) { const team = TEAMS[index % 3]; const owner = { id: `bot-${index}`, name: BOT_NAMES[index % BOT_NAMES.length], color: gameMode === 'teams' ? team.color : randomColor(), skin: randomSkin(), tactic: Math.random(), team: gameMode === 'teams' ? team.name : null }; bots.push(owner); const spawn = spawnPoint(); createCell(owner, spawn.x, spawn.y, 15 + Math.random() * 28); }
 }
 function startGame() {
-  worldSize = arenaSizeSelect.value; botTarget = Number(botCountSelect.value); WORLD.width = worldSize === 'small' ? 9000 : worldSize === 'large' ? 15000 : 11500; WORLD.height = worldSize === 'small' ? 6200 : worldSize === 'large' ? 10000 : 7800;
+  worldSize = arenaSizeSelect.value; botTarget = Number(botCountSelect.value); WORLD.width = worldSize === 'small' ? 11500 : worldSize === 'large' ? 20000 : 15000; WORLD.height = worldSize === 'small' ? 7800 : worldSize === 'large' ? 13000 : 10000;
   player.name = nicknameInput.value.trim().slice(0, 14) || 'James'; player.color = randomColor(); player.skin = skinSelect.value; player.splitKills = 0; gameMode = modeSelect.value; arenaLayout = layoutSelect.value; manualZoom = null; player.team = gameMode === 'teams' ? TEAMS[0].name : null; if (gameMode === 'teams') player.color = TEAMS[0].color; document.body.dataset.theme = themeSelect.value; cells.length = 0; ejectedMass.length = 0; particles.length = 0; floatingText.length = 0; mothercells.length = 0; alliances.length = 0; allianceOffers.length = 0; pendingAllianceOffer = null; player.betrayalUntil = 0; weather.type = 'clear'; weather.remaining = 28; selectedCell = null; resetFood(); resetArena(); match.startedAt = performance.now(); match.peakMass = 12; match.kills = 0; match.food = 0; match.viruses = 0; achievements.clear(); spectatorFocus = null; spectatorFree = false; resetPlayer(); setupBots(); if (gameMode === 'experimental') for (let index = 0; index < 8; index += 1) createMothercell(); gameState = 'playing'; sessionStorage.setItem(ACTIVE_MATCH_KEY, '1'); spectatorBar.hidden = true; menuScreen.hidden = true; gameOverScreen.hidden = true; startAudio();
 }
 function startSpectator() { gameMode = 'ffa'; cells.length = 0; ejectedMass.length = 0; resetArena(); setupBots(); spectatorFocus = bots[0]; spectatorFree = false; gameState = 'spectator'; menuScreen.hidden = true; gameOverScreen.hidden = true; spectatorBar.hidden = false; }
