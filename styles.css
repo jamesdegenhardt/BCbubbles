@@ -107,6 +107,7 @@ h1 { margin: 0; font-size: 18px; line-height: 1; letter-spacing: -.03em; }
 .alliance-button, .betray-button { position: absolute; right: 24px; z-index: 3; padding: 10px 12px; border: 1px solid rgba(112, 167, 255, .55); border-radius: 8px; background: rgba(7,16,25,.78); color: var(--ink); cursor: pointer; font: 600 11px 'Space Grotesk', sans-serif; backdrop-filter: blur(10px); }
 .alliance-button { bottom: 78px; }
 .alliance-reject-button { position: absolute; right: 24px; bottom: 170px; z-index: 3; padding: 8px 10px; border: 1px solid rgba(255, 105, 97, .55); border-radius: 8px; background: rgba(7,16,25,.78); color: var(--ink); cursor: pointer; font: 600 10px 'Space Grotesk', sans-serif; }
+.audio-button { position: absolute; right: 24px; bottom: 208px; z-index: 3; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: rgba(7,16,25,.78); color: var(--ink); cursor: pointer; font: 600 10px 'Space Grotesk', sans-serif; backdrop-filter: blur(10px); }
 .betray-button { bottom: 124px; border-color: rgba(255, 105, 97, .55); }
 .alliance-button b { display: block; margin-top: 2px; color: #70a7ff; font: 8px 'DM Mono', monospace; }
 .status-pill {
@@ -130,6 +131,7 @@ h1 { margin: 0; font-size: 18px; line-height: 1; letter-spacing: -.03em; }
   .alliance-button { bottom: 76px; }
   .betray-button { bottom: 126px; }
   .alliance-reject-button { right: 20px; bottom: 174px; }
+  .audio-button { right: 20px; bottom: 224px; }
   .status-pill { bottom: 20px; }
   .spectator-bar { bottom: 18px; max-width: calc(100vw - 28px); white-space: nowrap; }
   .spectator-help { display: none; }

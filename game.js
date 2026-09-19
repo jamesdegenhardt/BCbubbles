@@ -36,6 +36,7 @@ const teamMassValues = { Red: document.getElementById('redMass'), Green: documen
 const allianceButton = document.getElementById('allianceButton');
 const allianceRejectButton = document.getElementById('allianceRejectButton');
 const betrayButton = document.getElementById('betrayButton');
+const audioButton = document.getElementById('audioButton');
 
 const WORLD = { width: 5200, height: 3600 };
 const BOT_TARGET = 8;
@@ -142,6 +143,8 @@ function clampCameraToArena() {
   camera.y = arena.bottom - arena.top <= halfHeight * 2 ? (arena.top + arena.bottom) / 2 : clamp(camera.y, arena.top + halfHeight, arena.bottom - halfHeight);
 }
 function startAudio() { if (!audio.enabled) return; const AudioEngine = window.AudioContext || window.webkitAudioContext; if (!AudioEngine) return; if (!audioContext) audioContext = new AudioEngine(); if (audioContext.state === 'suspended') audioContext.resume(); }
+function updateAudioButton() { audioButton.textContent = audio.enabled ? 'Sound on' : 'Muted'; audioButton.setAttribute('aria-pressed', String(!audio.enabled)); }
+function toggleAudio() { audio.enabled = !audio.enabled; if (audioContext) { if (audio.enabled) audioContext.resume(); else audioContext.suspend(); } updateAudioButton(); }
 function playSound(type, intensity = 1) {
   if (!audioContext || !audio.enabled) return;
   const settings = { eat: [220, .06, 'sine'], eject: [310, .1, 'triangle'], split: [170, .18, 'sawtooth'], pop: [90, .28, 'square'], death: [55, .5, 'sawtooth'] }[type];
@@ -181,7 +184,7 @@ function setupBots() {
 }
 function startGame() {
   worldSize = arenaSizeSelect.value; botTarget = Number(botCountSelect.value); WORLD.width = worldSize === 'small' ? 11500 : worldSize === 'large' ? 20000 : 15000; WORLD.height = worldSize === 'small' ? 7800 : worldSize === 'large' ? 13000 : 10000;
-  player.name = nicknameInput.value.trim().slice(0, 14) || 'James'; player.color = randomColor(); player.skin = skinSelect.value; player.splitKills = 0; gameMode = modeSelect.value; arenaLayout = layoutSelect.value; manualZoom = null; player.team = gameMode === 'teams' ? TEAMS[0].name : null; if (gameMode === 'teams') player.color = TEAMS[0].color; document.body.dataset.theme = themeSelect.value; cells.length = 0; ejectedMass.length = 0; particles.length = 0; floatingText.length = 0; mothercells.length = 0; alliances.length = 0; allianceOffers.length = 0; pendingAllianceOffer = null; player.betrayalUntil = 0; weather.type = 'clear'; weather.remaining = 28; selectedCell = null; resetFood(); resetArena(); match.startedAt = performance.now(); match.durationMinutes = gameMode === 'timed' ? Number(timedDurationSelect.value) : 0; match.peakMass = 12; match.kills = 0; match.food = 0; match.viruses = 0; achievements.clear(); spectatorFocus = null; spectatorFree = false; resetPlayer(); setupBots(); if (gameMode === 'experimental') for (let index = 0; index < 8; index += 1) createMothercell(); gameState = 'playing'; sessionStorage.setItem(ACTIVE_MATCH_KEY, '1'); spectatorBar.hidden = true; menuScreen.hidden = true; gameOverScreen.hidden = true; startAudio();
+    player.name = nicknameInput.value.trim().slice(0, 14) || 'James'; player.color = randomColor(); player.skin = skinSelect.value; player.splitKills = 0; gameMode = modeSelect.value; arenaLayout = layoutSelect.value; manualZoom = null; player.team = gameMode === 'teams' ? TEAMS[0].name : null; if (gameMode === 'teams') player.color = TEAMS[0].color; document.body.dataset.theme = themeSelect.value; cells.length = 0; ejectedMass.length = 0; particles.length = 0; floatingText.length = 0; mothercells.length = 0; alliances.length = 0; allianceOffers.length = 0; pendingAllianceOffer = null; player.betrayalUntil = 0; weather.type = 'clear'; weather.remaining = 28; selectedCell = null; resetFood(); resetArena(); match.startedAt = performance.now(); match.durationMinutes = gameMode === 'timed' ? Number(timedDurationSelect.value) : 0; match.peakMass = 12; match.kills = 0; match.food = 0; match.viruses = 0; achievements.clear(); spectatorFocus = null; spectatorFree = false; resetPlayer(); setupBots(); if (gameMode === 'experimental') for (let index = 0; index < 8; index += 1) createMothercell(); gameState = 'playing'; sessionStorage.setItem(ACTIVE_MATCH_KEY, '1'); spectatorBar.hidden = true; menuScreen.hidden = true; gameOverScreen.hidden = true; startAudio();
 }
 function startSpectator() { gameMode = 'ffa'; cells.length = 0; ejectedMass.length = 0; resetArena(); setupBots(); spectatorFocus = bots[0]; spectatorFree = false; gameState = 'spectator'; menuScreen.hidden = true; gameOverScreen.hidden = true; spectatorBar.hidden = false; }
 function handoffPlayerControl() { const survivor = ownedCells(player).sort((first, second) => second.targetMass - first.targetMass)[0]; if (!survivor) return false; for (const cell of ownedCells(player)) cell.aiControlled = cell !== survivor; survivor.aiControlled = false; player.controlledCell = survivor; selectedCell = null; emitBurst(survivor.x, survivor.y, player.color, 18, 150); addFloatingText(survivor.x, survivor.y, 'CONTROL TRANSFERRED', '#ffffff'); return true; }
@@ -491,6 +494,7 @@ splitButton.addEventListener('pointerdown', (event) => { event.preventDefault();
 allianceButton.addEventListener('click', (event) => { event.stopPropagation(); if (pendingAllianceOffer) acceptAlliance(); else offerPlayerAlliance(); });
 allianceRejectButton.addEventListener('click', (event) => { event.stopPropagation(); rejectAlliance(); });
 betrayButton.addEventListener('click', (event) => { event.stopPropagation(); betrayAlliances(); });
+audioButton.addEventListener('click', toggleAudio);
 let lastTouchAt = 0;
 addEventListener('resize', resize); addEventListener('pointermove', (event) => { if (gameState === 'spectator' && spectatorDrag) { camera.x -= (event.clientX - previousPointer.x) / camera.zoom; camera.y -= (event.clientY - previousPointer.y) / camera.zoom; spectatorFocus = null; spectatorFree = true; } pointer.x = event.clientX; pointer.y = event.clientY; previousPointer = { x: event.clientX, y: event.clientY }; pointer.active = true; }); addEventListener('pointerdown', (event) => { if (event.target.closest('button, input, select')) return; pointer.x = event.clientX; pointer.y = event.clientY; previousPointer = { x: event.clientX, y: event.clientY }; pointer.active = true; if (gameState === 'spectator') spectatorDrag = true; if (gameState === 'playing' && event.pointerType !== 'touch') { const clicked = cellAtScreenPoint(event.clientX, event.clientY); if (clicked) { if (selectedCell && selectedCell !== clicked) mergeSelectedCell(performance.now() / 1000); else selectedCell = clicked; } else { const bot = cellAtAnyScreenPoint(event.clientX, event.clientY); if (bot) offerAlliance(player, bot.owner); } } if (event.pointerType === 'touch' && performance.now() - lastTouchAt < 350) splitPlayer(); lastTouchAt = performance.now(); }); addEventListener('pointerup', () => { spectatorDrag = false; }); addEventListener('pointerleave', () => { pointer.active = false; spectatorDrag = false; });
 addEventListener('wheel', (event) => { if (gameState !== 'playing' && gameState !== 'spectator') return; event.preventDefault(); manualZoom = clamp((manualZoom || camera.zoom) * (event.deltaY > 0 ? .9 : 1.1), .35, 2.2); camera.zoom = manualZoom; if (gameState === 'spectator') { spectatorFocus = null; spectatorFree = true; } }, { passive: false });
@@ -507,4 +511,4 @@ addEventListener('keydown', (event) => {
   if (event.code === 'Digit3') { event.preventDefault(); offerPlayerAlliance(); }
   if (event.code === 'Digit4') { event.preventDefault(); betrayAlliances(); }
 });
-resize(); resetPlayer(); setupBots(); updateUi(12); if (sessionStorage.getItem(ACTIVE_MATCH_KEY) === '1') startGame(); requestAnimationFrame(frame);
+resize(); resetPlayer(); setupBots(); updateAudioButton(); updateUi(12); if (sessionStorage.getItem(ACTIVE_MATCH_KEY) === '1') startGame(); requestAnimationFrame(frame);
