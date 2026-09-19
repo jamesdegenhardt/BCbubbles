@@ -152,7 +152,7 @@
   </main>
   <script src="game.js"></script>
   <script>
-    if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('./sw.js');
+    if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((registration) => registration.update());
   </script>
 </body>
 </html>
