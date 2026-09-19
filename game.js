@@ -10,6 +10,8 @@ const massValue = document.getElementById('massValue');
 const healthValue = document.getElementById('healthValue');
 const scoreMass = document.getElementById('scoreMass');
 const eatenValue = document.getElementById('eatenValue');
+const matchTimeLine = document.getElementById('matchTimeLine');
+const matchTimeValue = document.getElementById('matchTimeValue');
 const massProgress = document.getElementById('massProgress');
 const statusText = document.getElementById('statusText');
 const gasStatus = document.getElementById('gasStatus');
@@ -424,6 +426,7 @@ function updateUi(totalMass, gasPhase = { phase: 'safe', remaining: 0 }) {
   const seconds = Math.max(0, Math.ceil(gasPhase.remaining));
   const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
   const timedClock = `${Math.floor(timedRemaining / 60)}:${String(timedRemaining % 60).padStart(2, '0')}`;
+  matchTimeLine.hidden = gameMode !== 'timed'; matchTimeValue.textContent = timedClock;
   massValue.textContent = Math.floor(totalMass); scoreMass.textContent = Math.floor(totalMass); healthValue.textContent = `${controlledHealth}%`; streakValue.textContent = player.streak; evolutionValue.textContent = ['I', 'II', 'III', 'IV', 'V'][player.evolution - 1]; eatenValue.textContent = player.eaten; massProgress.style.width = `${Math.min(100, 5 + totalMass / 2)}%`; statusText.textContent = `${livingBots.length} rivals in arena${player.betrayalUntil > performance.now() / 1000 ? ' · HUNTED' : ''}${weather.type !== 'clear' ? ` · ${weather.type.toUpperCase()}` : ''}`; gasStatus.textContent = pendingAllianceOffer ? `Alliance from ${pendingAllianceOffer.from.name}` : gameMode === 'timed' ? `Time left ${timedClock}` : gasPhase.phase === 'safe' ? `Gas starts in ${clock}` : gasPhase.phase === 'shrinking' ? `Gas advances ${clock}` : gasPhase.phase === 'pause' ? `Gas pauses ${clock}` : 'Gas settled'; allianceButton.textContent = pendingAllianceOffer ? 'Accept alliance' : 'Offer alliance'; allianceButton.hidden = gameMode === 'teams'; allianceRejectButton.hidden = gameMode === 'teams' || !pendingAllianceOffer; betrayButton.hidden = gameMode === 'teams';
   const rankings = [player, ...livingBots].map((owner) => ({ owner, mass: ownedCells(owner).reduce((sum, cell) => sum + cell.targetMass, 0) })).sort((first, second) => second.mass - first.mass).slice(0, 10);
   if (gameState === 'playing' && rankings[0]?.owner === player) unlockAchievement('apex', 'Apex Predator');

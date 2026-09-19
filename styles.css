@@ -79,6 +79,8 @@ h1 { margin: 0; font-size: 18px; line-height: 1; letter-spacing: -.03em; }
 .stat-line { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px; }
 .stat-line span { color: var(--muted); font: 10px 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .08em; }
 .stat-line strong { font-size: 18px; font-weight: 500; }
+.match-time-line { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+.match-time-line strong { color: var(--accent); font-family: 'DM Mono', monospace; font-size: 16px; }
 .progress-track { height: 3px; margin-top: 11px; overflow: hidden; background: rgba(255,255,255,.1); border-radius: 3px; }
 .progress-track span { display: block; width: 5%; height: 100%; background: var(--accent); transition: width .25s ease; }
 .leaderboard { top: 172px; right: clamp(20px, 4vw, 56px); width: 206px; padding: 13px 15px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); backdrop-filter: blur(12px); }
