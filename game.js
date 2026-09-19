@@ -148,7 +148,7 @@ function emitBurst(x, y, color, count = 14, force = 120) { for (let index = 0; i
 function addFloatingText(x, y, text, color = '#a8f36d') { floatingText.push({ x, y, text, color, life: 1.1, maxLife: 1.1 }); }
 function updateEffects(delta) { for (let index = particles.length - 1; index >= 0; index -= 1) { const particle = particles[index]; particle.life -= delta; particle.x += particle.vx * delta; particle.y += particle.vy * delta; particle.vx *= Math.pow(.02, delta); particle.vy *= Math.pow(.02, delta); if (particle.life <= 0) particles.splice(index, 1); } for (let index = floatingText.length - 1; index >= 0; index -= 1) { const item = floatingText[index]; item.life -= delta; item.y -= 28 * delta; if (item.life <= 0) floatingText.splice(index, 1); } }
 
-function resetFood() { food.length = 0; for (let gridX = 0; gridX < Math.ceil(WORLD.width / GRID_SIZE); gridX += 1) for (let gridY = 0; gridY < Math.ceil(WORLD.height / GRID_SIZE); gridY += 1) food.push(randomFood(gridX, gridY)); }
+function resetFood() { food.length = 0; for (let gridX = 0; gridX < Math.ceil(WORLD.width / GRID_SIZE); gridX += 1) for (let gridY = 0; gridY < Math.ceil(WORLD.height / GRID_SIZE); gridY += 1) if ((gridX + gridY) % 5 === 0) food.push(randomFood(gridX, gridY)); }
 resetFood();
 for (let index = 0; index < VIRUS_TARGET; index += 1) { const spawn = spawnPoint(260); viruses.push({ x: spawn.x, y: spawn.y, radius: 44, storedMass: 0, rotation: Math.random() * 6 }); }
 function randomPowerup() { const spawn = spawnPoint(120); const types = ['speed', 'magnet', 'merge', 'resistance', 'invisibility']; return { x: spawn.x, y: spawn.y, radius: 13, type: types[Math.floor(Math.random() * types.length)], pulse: Math.random() * 6 }; }
