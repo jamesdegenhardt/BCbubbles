@@ -19,6 +19,8 @@ const skinSelect = document.getElementById('skin');
 const themeSelect = document.getElementById('theme');
 const splitButton = document.getElementById('splitButton');
 const modeSelect = document.getElementById('mode');
+const timedDurationLabel = document.getElementById('timedDurationLabel');
+const timedDurationSelect = document.getElementById('timedDuration');
 const menuSpectateButton = document.getElementById('menuSpectateButton');
 const deathSpectateButton = document.getElementById('deathSpectateButton');
 const spectatorBar = document.getElementById('spectatorBar');
@@ -86,7 +88,7 @@ let spectatorFree = false;
 let spectatorDrag = false;
 let selectedCell = null;
 let previousPointer = { x: 0, y: 0 };
-const match = { startedAt: 0, peakMass: 12, kills: 0, food: 0, viruses: 0 };
+const match = { startedAt: 0, durationMinutes: 0, peakMass: 12, kills: 0, food: 0, viruses: 0 };
 let arenaLayout = 'open';
 let pendingAllianceOffer = null;
 let manualZoom = null;
@@ -172,13 +174,14 @@ function centroid(owner) {
   return pieces.reduce((center, cell) => ({ x: center.x + cell.visualX / pieces.length, y: center.y + cell.visualY / pieces.length }), { x: 0, y: 0 });
 }
 function resetPlayer() { player.eaten = 0; player.kills = 0; player.streak = 0; player.evolution = 1; player.splitCooldown = 0; player.controlledCell = createCell(player, WORLD.width / 2, WORLD.height / 2, 12); }
+function respawnPlayer() { const spawn = spawnPoint(260); player.controlledCell = createCell(player, spawn.x, spawn.y, 12); selectedCell = null; addFloatingText(player.controlledCell.x, player.controlledCell.y, 'RESPAWNED', '#ffffff'); }
 function setupBots() {
   bots.length = 0;
   for (let index = 0; index < botTarget; index += 1) { const team = TEAMS[index % 3]; const owner = { id: `bot-${index}`, name: BOT_NAMES[index % BOT_NAMES.length], color: gameMode === 'teams' ? team.color : randomColor(), skin: randomSkin(), tactic: Math.random(), team: gameMode === 'teams' ? team.name : null }; bots.push(owner); const spawn = spawnPoint(); createCell(owner, spawn.x, spawn.y, 15 + Math.random() * 28); }
 }
 function startGame() {
   worldSize = arenaSizeSelect.value; botTarget = Number(botCountSelect.value); WORLD.width = worldSize === 'small' ? 11500 : worldSize === 'large' ? 20000 : 15000; WORLD.height = worldSize === 'small' ? 7800 : worldSize === 'large' ? 13000 : 10000;
-  player.name = nicknameInput.value.trim().slice(0, 14) || 'James'; player.color = randomColor(); player.skin = skinSelect.value; player.splitKills = 0; gameMode = modeSelect.value; arenaLayout = layoutSelect.value; manualZoom = null; player.team = gameMode === 'teams' ? TEAMS[0].name : null; if (gameMode === 'teams') player.color = TEAMS[0].color; document.body.dataset.theme = themeSelect.value; cells.length = 0; ejectedMass.length = 0; particles.length = 0; floatingText.length = 0; mothercells.length = 0; alliances.length = 0; allianceOffers.length = 0; pendingAllianceOffer = null; player.betrayalUntil = 0; weather.type = 'clear'; weather.remaining = 28; selectedCell = null; resetFood(); resetArena(); match.startedAt = performance.now(); match.peakMass = 12; match.kills = 0; match.food = 0; match.viruses = 0; achievements.clear(); spectatorFocus = null; spectatorFree = false; resetPlayer(); setupBots(); if (gameMode === 'experimental') for (let index = 0; index < 8; index += 1) createMothercell(); gameState = 'playing'; sessionStorage.setItem(ACTIVE_MATCH_KEY, '1'); spectatorBar.hidden = true; menuScreen.hidden = true; gameOverScreen.hidden = true; startAudio();
+  player.name = nicknameInput.value.trim().slice(0, 14) || 'James'; player.color = randomColor(); player.skin = skinSelect.value; player.splitKills = 0; gameMode = modeSelect.value; arenaLayout = layoutSelect.value; manualZoom = null; player.team = gameMode === 'teams' ? TEAMS[0].name : null; if (gameMode === 'teams') player.color = TEAMS[0].color; document.body.dataset.theme = themeSelect.value; cells.length = 0; ejectedMass.length = 0; particles.length = 0; floatingText.length = 0; mothercells.length = 0; alliances.length = 0; allianceOffers.length = 0; pendingAllianceOffer = null; player.betrayalUntil = 0; weather.type = 'clear'; weather.remaining = 28; selectedCell = null; resetFood(); resetArena(); match.startedAt = performance.now(); match.durationMinutes = gameMode === 'timed' ? Number(timedDurationSelect.value) : 0; match.peakMass = 12; match.kills = 0; match.food = 0; match.viruses = 0; achievements.clear(); spectatorFocus = null; spectatorFree = false; resetPlayer(); setupBots(); if (gameMode === 'experimental') for (let index = 0; index < 8; index += 1) createMothercell(); gameState = 'playing'; sessionStorage.setItem(ACTIVE_MATCH_KEY, '1'); spectatorBar.hidden = true; menuScreen.hidden = true; gameOverScreen.hidden = true; startAudio();
 }
 function startSpectator() { gameMode = 'ffa'; cells.length = 0; ejectedMass.length = 0; resetArena(); setupBots(); spectatorFocus = bots[0]; spectatorFree = false; gameState = 'spectator'; menuScreen.hidden = true; gameOverScreen.hidden = true; spectatorBar.hidden = false; }
 function handoffPlayerControl() { const survivor = ownedCells(player).sort((first, second) => second.targetMass - first.targetMass)[0]; if (!survivor) return false; for (const cell of ownedCells(player)) cell.aiControlled = cell !== survivor; survivor.aiControlled = false; player.controlledCell = survivor; selectedCell = null; emitBurst(survivor.x, survivor.y, player.color, 18, 150); addFloatingText(survivor.x, survivor.y, 'CONTROL TRANSFERRED', '#ffffff'); return true; }
@@ -188,10 +191,12 @@ function updateMothercells(delta) { if (gameMode !== 'experimental') return; for
 function updatePowerups(cell, delta) { cell.speedBoost = Math.max(0, cell.speedBoost - delta); cell.magnet = Math.max(0, cell.magnet - delta); cell.gasResistance = Math.max(0, cell.gasResistance - delta); cell.invisible = Math.max(0, cell.invisible - delta); if (cell.magnet > 0) for (const pellet of food) { const distance = distanceBetween(cell, pellet); if (distance < 230 && distance > 1) { pellet.x += (cell.x - pellet.x) / distance * 90 * delta; pellet.y += (cell.y - pellet.y) / distance * 90 * delta; } } for (let index = powerups.length - 1; index >= 0; index -= 1) if (distanceBetween(cell, powerups[index]) < cell.radius + powerups[index].radius) { applyPowerup(cell, powerups[index]); powerups[index] = randomPowerup(); } }
 function endGame(result) {
   if (gameState !== 'playing') return;
+  if (gameMode === 'timed' && result === 'loss' && (performance.now() - match.startedAt) / 1000 < match.durationMinutes * 60) { respawnPlayer(); return; }
+  if (gameMode === 'timed' && result === 'time') { const scores = [player, ...bots].map((owner) => ({ owner, mass: ownedCells(owner).reduce((sum, cell) => sum + cell.targetMass, 0) })).sort((first, second) => second.mass - first.mass); result = scores[0]?.owner === player ? 'win' : 'loss'; }
   sessionStorage.removeItem(ACTIVE_MATCH_KEY);
   const total = ownedCells(player).reduce((sum, cell) => sum + cell.targetMass, 0); finalMass.textContent = Math.floor(total); gameOverScreen.hidden = false; gameState = 'over';
-  gameOverTitle.textContent = result === 'win' ? 'Arena conquered' : 'Cell lost';
-  gameOverScreen.querySelector('.eyebrow').textContent = result === 'win' ? 'Every rival has been absorbed' : 'The arena keeps moving';
+  gameOverTitle.textContent = gameMode === 'timed' ? (result === 'win' ? 'Time victory' : 'Time expired') : result === 'win' ? 'Arena conquered' : 'Cell lost';
+  gameOverScreen.querySelector('.eyebrow').textContent = gameMode === 'timed' ? 'Largest cell at the final bell' : result === 'win' ? 'Every rival has been absorbed' : 'The arena keeps moving';
   document.getElementById('reportTime').textContent = `${Math.floor((performance.now() - match.startedAt) / 60000)}:${String(Math.floor((performance.now() - match.startedAt) / 1000) % 60).padStart(2, '0')}`;
   document.getElementById('reportPeak').textContent = Math.floor(match.peakMass); document.getElementById('reportKills').textContent = match.kills; document.getElementById('reportFood').textContent = match.food; document.getElementById('reportViruses').textContent = match.viruses;
   playSound(result === 'win' ? 'eat' : 'death', result === 'win' ? .8 : 1); emitBurst(camera.x, camera.y, result === 'win' ? '#a8f36d' : '#ff8b79', 36, 300);
@@ -293,13 +298,13 @@ function consumeCells() {
     for (let preyIndex = cells.length - 1; preyIndex >= 0; preyIndex -= 1) {
       const prey = cells[preyIndex];
       if (predator === prey || predator.owner === prey.owner || allianceBetween(predator.owner, prey.owner) || (gameMode === 'teams' && predator.owner.team && predator.owner.team === prey.owner.team) || predator.mass < prey.mass * 1.1) continue;
-      if (distanceBetween(predator, prey) < predator.radius - prey.radius * .3) { const growth = Math.max(prey.mass, MIN_CELL_GROWTH) * (1 + predator.mass / 100); predator.targetMass += growth; if (predator.owner === player) { player.eaten += 1; player.kills += 1; player.streak += 1; match.kills += 1; updateEvolution(); if (ownedCells(player).length > 1) { player.splitKills += 1; if (player.splitKills >= 10) unlockAchievement('split-specialist', 'Split Specialist'); } } const wasControlled = prey === player.controlledCell; emitBurst(prey.x, prey.y, prey.color, 12, 160); addFloatingText(predator.x, predator.y, `+${Math.floor(growth)}${predator.owner === player ? ` STREAK ${player.streak}` : ''}`); playSound('eat'); removeCell(prey); if (wasControlled && !handoffPlayerControl()) endGame('loss'); break; }
+      if (distanceBetween(predator, prey) < predator.radius - prey.radius * .3) { const growth = Math.max(prey.mass, MIN_CELL_GROWTH) * (1 + predator.mass / 100) / 2; predator.targetMass += growth; if (predator.owner === player) { player.eaten += 1; player.kills += 1; player.streak += 1; match.kills += 1; updateEvolution(); if (ownedCells(player).length > 1) { player.splitKills += 1; if (player.splitKills >= 10) unlockAchievement('split-specialist', 'Split Specialist'); } } const wasControlled = prey === player.controlledCell; emitBurst(prey.x, prey.y, prey.color, 12, 160); addFloatingText(predator.x, predator.y, `+${Math.floor(growth)}${predator.owner === player ? ` STREAK ${player.streak}` : ''}`); playSound('eat'); removeCell(prey); if (wasControlled && !handoffPlayerControl()) endGame('loss'); break; }
     }
   }
   for (const cell of cells.slice()) for (const virus of viruses) if (cell.radius > virus.radius * 1.1 && distanceBetween(cell, virus) < cell.radius - virus.radius * .2) { if (cell.owner === player) { match.viruses += 1; if (match.viruses >= 3) unlockAchievement('virus-buster', 'Virus Buster'); } popCell(cell, virus); break; }
   if (!ownedCells(player).length) endGame('loss');
   else if (gameMode === 'teams') resolveTeamWinner();
-  else if (bots.every((bot) => !ownedCells(bot).length)) endGame('win');
+  else if (gameMode !== 'timed' && bots.every((bot) => !ownedCells(bot).length)) endGame('win');
 }
 function mergePlayerPieces(now) {
   for (let firstIndex = 0; firstIndex < cells.length; firstIndex += 1) for (let secondIndex = firstIndex + 1; secondIndex < cells.length; secondIndex += 1) {
@@ -362,6 +367,7 @@ function updateEjected(delta) {
 
 function update(delta, now) {
   if (gameState !== 'playing' && gameState !== 'spectator') return;
+  if (gameState === 'playing' && gameMode === 'timed' && (performance.now() - match.startedAt) / 1000 >= match.durationMinutes * 60) { endGame('time'); return; }
   const gasPhase = gameState === 'playing' ? updateArena((performance.now() - match.startedAt) / 1000) : { phase: 'safe', remaining: 0 };
   updateFood(now);
   updateHazards(delta);
@@ -411,9 +417,11 @@ function updateUi(totalMass, gasPhase = { phase: 'safe', remaining: 0 }) {
   teamPanel.hidden = gameMode !== 'teams';
   for (const team of TEAMS) teamMassValues[team.name].textContent = Math.floor(teamMass(team.name));
   const controlledHealth = player.controlledCell ? Math.ceil(player.controlledCell.health) : 0;
+  const timedRemaining = Math.max(0, Math.ceil(match.durationMinutes * 60 - (performance.now() - match.startedAt) / 1000));
   const seconds = Math.max(0, Math.ceil(gasPhase.remaining));
   const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-  massValue.textContent = Math.floor(totalMass); scoreMass.textContent = Math.floor(totalMass); healthValue.textContent = `${controlledHealth}%`; streakValue.textContent = player.streak; evolutionValue.textContent = ['I', 'II', 'III', 'IV', 'V'][player.evolution - 1]; eatenValue.textContent = player.eaten; massProgress.style.width = `${Math.min(100, 5 + totalMass / 2)}%`; statusText.textContent = `${livingBots.length} rivals in arena${player.betrayalUntil > performance.now() / 1000 ? ' · HUNTED' : ''}${weather.type !== 'clear' ? ` · ${weather.type.toUpperCase()}` : ''}`; gasStatus.textContent = pendingAllianceOffer ? `Alliance from ${pendingAllianceOffer.from.name}` : gasPhase.phase === 'safe' ? `Gas starts in ${clock}` : gasPhase.phase === 'shrinking' ? `Gas advances ${clock}` : gasPhase.phase === 'pause' ? `Gas pauses ${clock}` : 'Gas settled'; allianceButton.textContent = pendingAllianceOffer ? 'Accept alliance' : 'Offer alliance'; allianceButton.hidden = gameMode === 'teams'; allianceRejectButton.hidden = gameMode === 'teams' || !pendingAllianceOffer; betrayButton.hidden = gameMode === 'teams';
+  const timedClock = `${Math.floor(timedRemaining / 60)}:${String(timedRemaining % 60).padStart(2, '0')}`;
+  massValue.textContent = Math.floor(totalMass); scoreMass.textContent = Math.floor(totalMass); healthValue.textContent = `${controlledHealth}%`; streakValue.textContent = player.streak; evolutionValue.textContent = ['I', 'II', 'III', 'IV', 'V'][player.evolution - 1]; eatenValue.textContent = player.eaten; massProgress.style.width = `${Math.min(100, 5 + totalMass / 2)}%`; statusText.textContent = `${livingBots.length} rivals in arena${player.betrayalUntil > performance.now() / 1000 ? ' · HUNTED' : ''}${weather.type !== 'clear' ? ` · ${weather.type.toUpperCase()}` : ''}`; gasStatus.textContent = pendingAllianceOffer ? `Alliance from ${pendingAllianceOffer.from.name}` : gameMode === 'timed' ? `Time left ${timedClock}` : gasPhase.phase === 'safe' ? `Gas starts in ${clock}` : gasPhase.phase === 'shrinking' ? `Gas advances ${clock}` : gasPhase.phase === 'pause' ? `Gas pauses ${clock}` : 'Gas settled'; allianceButton.textContent = pendingAllianceOffer ? 'Accept alliance' : 'Offer alliance'; allianceButton.hidden = gameMode === 'teams'; allianceRejectButton.hidden = gameMode === 'teams' || !pendingAllianceOffer; betrayButton.hidden = gameMode === 'teams';
   const rankings = [player, ...livingBots].map((owner) => ({ owner, mass: ownedCells(owner).reduce((sum, cell) => sum + cell.targetMass, 0) })).sort((first, second) => second.mass - first.mass).slice(0, 10);
   if (gameState === 'playing' && rankings[0]?.owner === player) unlockAchievement('apex', 'Apex Predator');
   leaderboardList.innerHTML = rankings.map((entry) => `<li class="${entry.owner === player ? 'is-player' : ''}"><strong>${entry.owner.name}</strong><em>${Math.floor(entry.mass)}</em></li>`).join('');
@@ -471,6 +479,9 @@ function draw() {
 let previous = performance.now();
 function frame(now) { const delta = Math.min((now - previous) / 1000, .05); previous = now; update(delta, now / 1000); draw(); requestAnimationFrame(frame); }
 function cycleSpectatorFocus() { const ranked = bots.filter((bot) => ownedCells(bot).length).sort((first, second) => ownedCells(second).reduce((sum, cell) => sum + cell.targetMass, 0) - ownedCells(first).reduce((sum, cell) => sum + cell.targetMass, 0)); const currentIndex = ranked.indexOf(spectatorFocus); spectatorFocus = ranked[(currentIndex + 1) % Math.max(1, ranked.length)] || null; spectatorFree = false; }
+function updateTimedDurationVisibility() { const timed = modeSelect.value === 'timed'; timedDurationLabel.hidden = !timed; timedDurationSelect.hidden = !timed; }
+modeSelect.addEventListener('change', updateTimedDurationVisibility);
+updateTimedDurationVisibility();
 startForm.addEventListener('submit', (event) => { event.preventDefault(); startGame(); });
 respawnButton.addEventListener('click', startGame);
 menuSpectateButton.addEventListener('click', startSpectator);
