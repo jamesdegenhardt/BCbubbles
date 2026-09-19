@@ -391,7 +391,7 @@ function update(delta, now) {
       if (cell.stateTime <= 0 || !cell.target) { const decision = chooseBotTarget(cell); cell.state = decision.state; cell.target = decision.target; cell.stateTime = .5 + Math.random(); }
       if (cell.target) { const targetX = cell.state === 'flee' ? cell.x * 2 - cell.target.x : cell.target.x; const targetY = cell.state === 'flee' ? cell.y * 2 - cell.target.y : cell.target.y; const distance = Math.hypot(targetX - cell.x, targetY - cell.y); if (distance) { directionX = (targetX - cell.x) / distance; directionY = (targetY - cell.y) / distance; } }
     }
-    const speed = Math.max(55, 235 / Math.pow(cell.mass / 12, .23)) * (1 + (cell.evolution - 1) * .08) * (cell.speedBoost > 0 ? 1.65 : 1);
+    const speed = Math.max(55, 235 / Math.pow(cell.mass / 12, .23)) * 1.5 * (1 + (cell.evolution - 1) * .08) * (cell.speedBoost > 0 ? 1.65 : 1);
     const steering = 1 - Math.pow(.0001, delta);
     cell.actionCooldown = Math.max(0, cell.actionCooldown - delta);
     updatePowerups(cell, delta);
@@ -500,6 +500,7 @@ addEventListener('resize', resize); addEventListener('pointermove', (event) => {
 addEventListener('wheel', (event) => { if (gameState !== 'playing' && gameState !== 'spectator') return; event.preventDefault(); manualZoom = clamp((manualZoom || camera.zoom) * (event.deltaY > 0 ? .9 : 1.1), .35, 2.2); camera.zoom = manualZoom; if (gameState === 'spectator') { spectatorFocus = null; spectatorFree = true; } }, { passive: false });
 addEventListener('keydown', (event) => {
   if (event.code === 'Space' || event.key === ' ') {
+    if (gameState !== 'playing') return;
     event.preventDefault();
     splitPlayer();
   }
@@ -510,5 +511,5 @@ addEventListener('keydown', (event) => {
   if (event.code === 'Digit2') { event.preventDefault(); acceptAlliance(); }
   if (event.code === 'Digit3') { event.preventDefault(); offerPlayerAlliance(); }
   if (event.code === 'Digit4') { event.preventDefault(); betrayAlliances(); }
-});
+}, true);
 resize(); resetPlayer(); setupBots(); updateAudioButton(); updateUi(12); if (sessionStorage.getItem(ACTIVE_MATCH_KEY) === '1') startGame(); requestAnimationFrame(frame);
