@@ -45,6 +45,7 @@ const SHRINK_DELAY = 60;
 const SHRINK_PHASE = 560;
 const SHRINK_PAUSE = 20;
 const SHRINK_CYCLES = 3;
+const FOOD_RESPAWN_DELAY = 15;
 const GAS_DAMAGE_RATE = 7;
 const DASH_COOLDOWN = 4;
 const DASH_FORCE = 620;
@@ -54,6 +55,7 @@ const MINIMUM_CELL_MASS = 12;
 const ACTIVE_MATCH_KEY = 'bcbubbles-match-active';
 const BOT_NAMES = ['Nova', 'Miso', 'Orbit', 'Kite', 'Pixel', 'Zest', 'Comet', 'Echo', 'Mochi', 'Vanta', 'Sprout', 'Rook'];
 const food = [];
+const foodRespawnAt = new Map();
 const cells = [];
 const ejectedMass = [];
 const viruses = [];
@@ -103,8 +105,9 @@ function radiusForMass(mass) { return 24 + Math.sqrt(Math.max(0, mass - 12)) * 4
 function distanceBetween(first, second) { return Math.hypot(first.x - second.x, first.y - second.y); }
 function randomColor() { return `hsl(${Math.floor(Math.random() * 360)} 82% 62%)`; }
 function randomSkin() { return ['neon', 'planet', 'geometry'][Math.floor(Math.random() * 3)]; }
-function randomFood(gridX, gridY) { const legendary = Math.random() < .025; const x = gridX === undefined ? Math.random() * WORLD.width : gridX * GRID_SIZE + 12 + Math.random() * (GRID_SIZE - 24); const y = gridY === undefined ? Math.random() * WORLD.height : gridY * GRID_SIZE + 12 + Math.random() * (GRID_SIZE - 24); return { x: clamp(x, 12, WORLD.width - 12), y: clamp(y, 12, WORLD.height - 12), gridX, gridY, radius: legendary ? 11 : 5 + Math.random() * 4, value: legendary ? 12 : 1, legendary, color: legendary ? '#ffd34e' : `hsl(${Math.floor(Math.random() * 360)} 90% 67%)` }; }
+function randomFood(gridX, gridY) { const x = gridX === undefined ? Math.random() * WORLD.width : gridX * GRID_SIZE + 12 + Math.random() * (GRID_SIZE - 24); const y = gridY === undefined ? Math.random() * WORLD.height : gridY * GRID_SIZE + 12 + Math.random() * (GRID_SIZE - 24); return { x: clamp(x, 12, WORLD.width - 12), y: clamp(y, 12, WORLD.height - 12), gridX, gridY, radius: 5 + Math.random() * 4, value: 1, color: `hsl(${Math.floor(Math.random() * 360)} 90% 67%)` }; }
 function foodInGrid(gridX, gridY) { return food.filter((pellet) => pellet.gridX === gridX && pellet.gridY === gridY).length; }
+function foodGridKey(gridX, gridY) { return `${gridX}:${gridY}`; }
 function spawnPoint(margin = 180) { return { x: margin + Math.random() * (WORLD.width - margin * 2), y: margin + Math.random() * (WORLD.height - margin * 2) }; }
 function resetArena() { arena.left = 0; arena.top = 0; arena.right = WORLD.width; arena.bottom = WORLD.height; obstacles.length = 0; hazards.length = 0; blackholes.length = 0; currents.length = 0; portals.length = 0; if (arenaLayout === 'crossfire') obstacles.push({ x: WORLD.width * .46, y: WORLD.height * .43, width: WORLD.width * .08, height: WORLD.height * .14 }); if (arenaLayout === 'rings') obstacles.push({ x: WORLD.width / 2, y: WORLD.height / 2, radius: Math.min(WORLD.width, WORLD.height) * .12 }, { x: WORLD.width / 2, y: WORLD.height / 2, radius: Math.min(WORLD.width, WORLD.height) * .25 }); if (gameMode === 'maze') { for (let index = 1; index < 6; index += 1) obstacles.push({ x: index * WORLD.width / 6, y: index % 2 ? WORLD.height * .18 : WORLD.height * .58, width: WORLD.width / 3, height: WORLD.height * .07 }); } for (let index = 0; index < 7; index += 1) { const spawn = spawnPoint(260); hazards.push({ x: spawn.x, y: spawn.y, radius: 28, angle: Math.random() * Math.PI * 2, speed: 35 + Math.random() * 45, orbit: 80 + Math.random() * 150, originX: spawn.x, originY: spawn.y, pulse: Math.random() * 6 }); } for (let index = 0; index < 4; index += 1) { const spawn = spawnPoint(320); currents.push({ x: spawn.x, y: spawn.y, radius: 180, vx: Math.random() * 90 - 45, vy: Math.random() * 90 - 45, pulse: Math.random() * 6 }); } for (let index = 0; index < 3; index += 1) { const spawn = spawnPoint(420); blackholes.push({ x: spawn.x, y: spawn.y, radius: 70, pull: 190, type: index % 2 ? 'forward' : 'vortex', angle: Math.random() * Math.PI * 2, pulse: Math.random() * 6 }); } for (let index = 0; index < 3; index += 1) { const first = spawnPoint(360); const second = spawnPoint(360); portals.push({ x: first.x, y: first.y, radius: 32, pair: index }); portals.push({ x: second.x, y: second.y, radius: 32, pair: index }); } }
 function updateArena(elapsed) {
@@ -148,7 +151,8 @@ function emitBurst(x, y, color, count = 14, force = 120) { for (let index = 0; i
 function addFloatingText(x, y, text, color = '#a8f36d') { floatingText.push({ x, y, text, color, life: 1.1, maxLife: 1.1 }); }
 function updateEffects(delta) { for (let index = particles.length - 1; index >= 0; index -= 1) { const particle = particles[index]; particle.life -= delta; particle.x += particle.vx * delta; particle.y += particle.vy * delta; particle.vx *= Math.pow(.02, delta); particle.vy *= Math.pow(.02, delta); if (particle.life <= 0) particles.splice(index, 1); } for (let index = floatingText.length - 1; index >= 0; index -= 1) { const item = floatingText[index]; item.life -= delta; item.y -= 28 * delta; if (item.life <= 0) floatingText.splice(index, 1); } }
 
-function resetFood() { food.length = 0; for (let gridX = 0; gridX < Math.ceil(WORLD.width / GRID_SIZE); gridX += 1) for (let gridY = 0; gridY < Math.ceil(WORLD.height / GRID_SIZE); gridY += 1) if ((gridX + gridY) % 5 === 0) food.push(randomFood(gridX, gridY)); }
+function resetFood() { food.length = 0; foodRespawnAt.clear(); for (let gridX = 0; gridX < Math.ceil(WORLD.width / GRID_SIZE); gridX += 1) for (let gridY = 0; gridY < Math.ceil(WORLD.height / GRID_SIZE); gridY += 1) if ((gridX + gridY) % 5 === 0) food.push(randomFood(gridX, gridY)); }
+function updateFood(now) { for (const [key, respawnAt] of foodRespawnAt) { if (now < respawnAt) continue; const [gridX, gridY] = key.split(':').map(Number); if (!foodInGrid(gridX, gridY)) food.push(randomFood(gridX, gridY)); foodRespawnAt.delete(key); } }
 resetFood();
 for (let index = 0; index < VIRUS_TARGET; index += 1) { const spawn = spawnPoint(260); viruses.push({ x: spawn.x, y: spawn.y, radius: 44, storedMass: 0, rotation: Math.random() * 6 }); }
 function randomPowerup() { const spawn = spawnPoint(120); const types = ['speed', 'magnet', 'merge', 'resistance', 'invisibility']; return { x: spawn.x, y: spawn.y, radius: 13, type: types[Math.floor(Math.random() * types.length)], pulse: Math.random() * 6 }; }
@@ -268,7 +272,7 @@ function removeCell(cell) { const index = cells.indexOf(cell); if (index >= 0) c
 function applyFood(cell) {
   for (let index = food.length - 1; index >= 0; index -= 1) {
     const pellet = food[index];
-    if (distanceBetween(cell, pellet) < cell.radius + pellet.radius) { food[index] = randomFood(pellet.gridX, pellet.gridY); cell.targetMass += pellet.value; if (cell.owner === player) { player.eaten += 1; match.food += 1; } emitBurst(pellet.x, pellet.y, pellet.color, pellet.legendary ? 12 : 4, pellet.legendary ? 130 : 55); playSound('eat', pellet.legendary ? 1 : .45); addFloatingText(cell.x, cell.y, pellet.legendary ? `+${pellet.value} LEGENDARY` : `+${pellet.value}`, pellet.legendary ? '#ffd34e' : '#a8f36d'); }
+    if (distanceBetween(cell, pellet) < cell.radius + pellet.radius) { food.splice(index, 1); foodRespawnAt.set(foodGridKey(pellet.gridX, pellet.gridY), performance.now() / 1000 + FOOD_RESPAWN_DELAY); cell.targetMass += pellet.value; if (cell.owner === player) { player.eaten += 1; match.food += 1; } emitBurst(pellet.x, pellet.y, pellet.color, 4, 55); playSound('eat', .45); addFloatingText(cell.x, cell.y, `+${pellet.value}`, '#a8f36d'); }
   }
 }
 function popCell(cell, virus) {
@@ -359,6 +363,7 @@ function updateEjected(delta) {
 function update(delta, now) {
   if (gameState !== 'playing' && gameState !== 'spectator') return;
   const gasPhase = gameState === 'playing' ? updateArena((performance.now() - match.startedAt) / 1000) : { phase: 'safe', remaining: 0 };
+  updateFood(now);
   updateHazards(delta);
   updateWeather(delta);
   resolveAllianceOffers(now);
@@ -452,7 +457,7 @@ function cellAtAnyScreenPoint(clientX, clientY) { const worldX = camera.x + (cli
 function draw() {
   const width = innerWidth; const height = innerHeight; const theme = document.body.dataset.theme || 'dark'; const background = theme === 'light' ? '#dfeadd' : theme === 'retro' ? '#160d28' : '#071019'; context.clearRect(0, 0, width, height); context.fillStyle = background; context.fillRect(0, 0, width, height); const glow = context.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height) * .72); glow.addColorStop(0, theme === 'light' ? 'rgba(135, 183, 137, .3)' : theme === 'retro' ? 'rgba(121, 52, 152, .28)' : 'rgba(22, 55, 60, .42)'); glow.addColorStop(1, 'rgba(7, 16, 25, 0)'); context.fillStyle = glow; context.fillRect(0, 0, width, height);
   context.save(); context.translate(width / 2, height / 2); context.scale(camera.zoom, camera.zoom); context.translate(-camera.x, -camera.y); drawGrid(width, height); drawPoisonGas(); drawArenaFeatures(); context.strokeStyle = 'rgba(168, 243, 109, .55)'; context.lineWidth = 12; context.strokeRect(arena.left, arena.top, arena.right - arena.left, arena.bottom - arena.top);
-  for (const pellet of food) { context.beginPath(); context.fillStyle = pellet.color; context.shadowColor = pellet.color; context.shadowBlur = pellet.legendary ? 24 : 10; context.arc(pellet.x, pellet.y, pellet.radius, 0, Math.PI * 2); context.fill(); context.shadowBlur = 0; }
+  for (const pellet of food) { context.beginPath(); context.fillStyle = pellet.color; context.shadowColor = pellet.color; context.shadowBlur = 10; context.arc(pellet.x, pellet.y, pellet.radius, 0, Math.PI * 2); context.fill(); context.shadowBlur = 0; }
   for (const virus of viruses) drawVirus(virus);
   for (const mother of mothercells) drawMothercell(mother);
   for (const orb of powerups) drawPowerup(orb);
